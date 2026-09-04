@@ -3,6 +3,8 @@
 const UI = require('./ui.js');
 const cv=wx.createCanvas(),ctx=cv.getContext('2d');
 const W=480,H=800;
+// 设计分辨率 480x800 → 实际画布（设备像素）的绘制缩放
+const SX=cv.width/W,SY=cv.height/H;
 function fit(){}
 
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -24,26 +26,31 @@ let bullets=[],ebullets=[],enemies=[],items=[],parts=[],eid=0;
 const player={x:W/2,y:H-90,r:4,lives:3,bombs:3,inv:2,weapon:'std',wlevel:1,mis:'none',mlevel:0,fireT:0,misT:0};
 
 
-  // 微信小游戏触摸适配
+  // 微信小游戏触摸适配：屏幕逻辑像素 → 游戏坐标(480x800)
+let winW=W,winH=H;
+try{const si=wx.getSystemInfoSync();winW=si.windowWidth;winH=si.windowHeight;}catch(e){}
+const toGame=t=>({x:t.clientX*W/winW,y:t.clientY*H/winH});
+const BOMB_BTN={x:W-50,y:H-50,r:45}; // 与 drawHUD 中的炸弹按钮位置保持一致
+let drag=null;
 wx.onTouchStart(e => {
   audio();
   const touch = e.touches[0];
   if (!touch) return;
-  // 检查是否点击了炸弹区域（屏幕左下角或右上角）
-  if (state === 'playing' && touch.clientX < 80 && touch.clientY > H - 100) {
+  const t = toGame(touch);
+  // 检查是否点击了炸弹按钮（屏幕右下角圆盘）
+  if (state === 'playing' && (t.x-BOMB_BTN.x)**2+(t.y-BOMB_BTN.y)**2 < BOMB_BTN.r**2) {
     useBomb(); return;
   }
   if (state !== 'playing') { startGame(); return; }
-  drag = { x: touch.clientX, y: touch.clientY, px: player.x, py: player.y };
+  drag = { x: t.x, y: t.y, px: player.x, py: player.y };
 });
 wx.onTouchMove(e => {
   if (!drag || state !== 'playing') return;
   const touch = e.touches[0];
   if (!touch) return;
-  // 小游戏 canvas 默认全屏，无需复杂的getBoundingClientRect比例转换，或者按实际尺寸比例
-  const sc = W / canvas.width; // 简化处理
-  player.x = clamp(drag.px + (touch.clientX - drag.x), 12, W - 12);
-  player.y = clamp(drag.py + (touch.clientY - drag.y), 70, H - 16);
+  const t = toGame(touch);
+  player.x = clamp(drag.px + (t.x - drag.x), 12, W - 12);
+  player.y = clamp(drag.py + (t.y - drag.y), 70, H - 16);
 });
 wx.onTouchEnd(() => drag = null);
   
@@ -310,7 +317,7 @@ function drawItem(it){
   ctx.fillText(it.letter,0,1);ctx.restore();
 }
 function draw(){
-  ctx.setTransform(1,0,0,1,0,0);
+  ctx.setTransform(SX,0,0,SY,0,0);
   ctx.fillStyle='#05050c';ctx.fillRect(0,0,W,H);
   if(shake>0)ctx.translate(rnd(-shake,shake)*0.4,rnd(-shake,shake)*0.4);
   // 星空
@@ -331,15 +338,30 @@ function draw(){
   drawShip();
   drawHUD();
   if(flash>0){ctx.fillStyle=`rgba(255,255,255,${flash})`;ctx.fillRect(-20,-20,W+40,H+40);}
-  if(state==='clear'){ctx.fillStyle='#7dff8c';ctx.font='bold 40px monospace';ctx.textAlign='center';
-    ctx.fillText('STAGE CLEAR',W/2,H/2);ctx.font='16px monospace';ctx.fillText(`第 ${stage} 关通过`,W/2,H/2+30);}
-  if(state==='over'){ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);
-    ctx.fillStyle='#ff5d5d';ctx.font='bold 44px monospace';ctx.textAlign='center';ctx.fillText('GAME OVER',W/2,H/2-20);
-    ctx.fillStyle='#fff';ctx.font='18px monospace';ctx.fillText(`得分 ${score}`,W/2,H/2+20);
-    ctx.fillStyle='#9ca3af';ctx.font='14px monospace';ctx.fillText('点击屏幕重新开始',W/2,H/2+52);}
+  if(state==='clear'){
+    ctx.textAlign='center';
+    UI.drawNeonPanel(ctx,W/2-160,H/2-80,320,150,'SECTOR CLEARED','#7dff8c');
+    ctx.save();ctx.shadowColor='#7dff8c';ctx.shadowBlur=20;
+    ctx.fillStyle='#7dff8c';ctx.font='bold 38px monospace';
+    ctx.fillText('STAGE CLEAR',W/2,H/2-15);ctx.restore();
+    ctx.fillStyle='#fff';ctx.font='16px monospace';
+    ctx.fillText(`第 ${stage} 关通过 · 得分 ${score}`,W/2,H/2+30);}
+  if(state==='over'){
+    ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
+    ctx.textAlign='center';
+    UI.drawNeonPanel(ctx,W/2-160,H/2-110,320,210,'FINAL REPORT','#ff0055');
+    ctx.save();ctx.shadowColor='#ff0055';ctx.shadowBlur=25;
+    ctx.fillStyle='#ff0055';ctx.font='bold 42px monospace';
+    ctx.fillText('GAME OVER',W/2,H/2-45);ctx.restore();
+    ctx.fillStyle='#fff';ctx.font='bold 20px monospace';
+    ctx.fillText('SCORE  '+String(score).padStart(7,'0'),W/2,H/2+5);
+    ctx.fillStyle='#ffe600';ctx.font='14px monospace';
+    ctx.fillText('HI-SCORE  '+String(hi).padStart(7,'0'),W/2,H/2+35);
+    ctx.fillStyle=Math.floor(performance.now()/400)%2?'#00f3ff':'#666';
+    ctx.font='bold 16px monospace';ctx.fillText('▶ 点击屏幕重新开始 ◀',W/2,H/2+72);}
   overlay();
 }
-function overlay(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=scan;ctx.fillRect(0,0,W,H);}
+function overlay(){ctx.setTransform(SX,0,0,SY,0,0);ctx.fillStyle=scan;ctx.fillRect(0,0,W,H);}
 function drawTitle(){
   ctx.textAlign='center';
   ctx.save();
@@ -354,7 +376,7 @@ function drawTitle(){
   // 炫酷说明面板
   UI.drawNeonPanel(ctx, 40, 310, W-80, 210, 'MISSION BRIEFING', '#ffe600');
   ctx.fillStyle='#fff'; ctx.font='14px monospace';
-  const tips=['[ 拖动屏幕 ] 控制战机移动并自动射击','[ 点击左下角 ] 释放高能全屏炸弹','[ 红 R ] 追踪导弹 · [ 蓝 B ] 穿透激光','[ 道具掉落 ] 拾取升级武器与火力','[ 中心小白点 ] 战机核心判定区'];
+  const tips=['[ 拖动屏幕 ] 控制战机移动并自动射击','[ 点击右下角 ] 释放高能全屏炸弹','[ 红 R ] 追踪导弹 · [ 蓝 B ] 穿透激光','[ 道具掉落 ] 拾取升级武器与火力','[ 中心小白点 ] 战机核心判定区'];
   tips.forEach((t,i)=>ctx.fillText(t,W/2,360+i*32));
 
   ctx.fillStyle=Math.floor(performance.now()/400)%2?'#00f3ff':'#ff0055';
@@ -363,7 +385,7 @@ function drawTitle(){
   ctx.fillStyle='#9ca3af';ctx.font='14px monospace';ctx.fillText('HI-SCORE: '+String(hi).padStart(7,'0'),W/2,640);
 }
 function drawHUD(){
-  ctx.setTransform(1,0,0,1,0,0);
+  ctx.setTransform(SX,0,0,SY,0,0);
   
   // 绘制 HUD
   UI.drawNeonPanel(ctx, 10, 10, 140, 50, 'SCORE', '#00f3ff');
