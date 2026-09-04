@@ -27,8 +27,16 @@ const player={x:W/2,y:H-90,r:4,lives:3,bombs:3,inv:2,weapon:'std',wlevel:1,mis:'
 
 
   // 微信小游戏触摸适配：屏幕逻辑像素 → 游戏坐标(480x800)
-let winW=W,winH=H;
-try{const si=wx.getSystemInfoSync();winW=si.windowWidth;winH=si.windowHeight;}catch(e){}
+let winW=W,winH=H,safeTop=0;
+try{
+  const si=wx.getSystemInfoSync();
+  winW=si.windowWidth;winH=si.windowHeight;
+  // 刘海/摄像头与信号状态栏区域高度（逻辑像素），换算为游戏坐标后 HUD 需避开
+  const st=si.safeArea?si.safeArea.top:(si.statusBarHeight||0);
+  safeTop=Math.round(st*H/winH);
+}catch(e){}
+const HUD_TOP=safeTop+8; // 顶部 HUD 起始 y
+const PLAY_TOP=HUD_TOP+62; // 玩家可移动的最高位置（让开 HUD）
 const toGame=t=>({x:t.clientX*W/winW,y:t.clientY*H/winH});
 const BOMB_BTN={x:W-50,y:H-50,r:45}; // 与 drawHUD 中的炸弹按钮位置保持一致
 let drag=null;
@@ -50,7 +58,7 @@ wx.onTouchMove(e => {
   if (!touch) return;
   const t = toGame(touch);
   player.x = clamp(drag.px + (t.x - drag.x), 12, W - 12);
-  player.y = clamp(drag.py + (t.y - drag.y), 70, H - 16);
+  player.y = clamp(drag.py + (t.y - drag.y), PLAY_TOP, H - 16);
 });
 wx.onTouchEnd(() => drag = null);
   
@@ -387,18 +395,18 @@ function drawTitle(){
 function drawHUD(){
   ctx.setTransform(SX,0,0,SY,0,0);
   
-  // 绘制 HUD
-  UI.drawNeonPanel(ctx, 10, 10, 140, 50, 'SCORE', '#00f3ff');
+  // 绘制 HUD（整体下移，避开刘海摄像头与信号状态栏区域）
+  UI.drawNeonPanel(ctx, 10, HUD_TOP, 140, 50, 'SCORE', '#00f3ff');
   ctx.fillStyle='#fff'; ctx.font='bold 22px monospace';
-  ctx.fillText(String(score).padStart(7,'0'), 80, 45);
+  ctx.fillText(String(score).padStart(7,'0'), 80, HUD_TOP+35);
 
-  UI.drawNeonPanel(ctx, W-150, 10, 140, 50, 'PLAYER', '#00f3ff');
+  UI.drawNeonPanel(ctx, W-150, HUD_TOP, 140, 50, 'PLAYER', '#00f3ff');
   ctx.fillStyle='#d8ecff'; ctx.font='bold 16px monospace';
-  ctx.fillText('❤️  x '+player.lives, W-80, 45);
+  ctx.fillText('❤️  x '+player.lives, W-80, HUD_TOP+35);
 
-  UI.drawNeonPanel(ctx, 10, 70, 140, 40, 'WEAPON', '#ff0055');
+  UI.drawNeonPanel(ctx, 10, HUD_TOP+60, 140, 40, 'WEAPON', '#ff0055');
   ctx.fillStyle='#ff0055'; ctx.font='14px monospace';
-  ctx.fillText(player.weapon.toUpperCase() + ' Lv.' + player.wlevel, 80, 100);
+  ctx.fillText(player.weapon.toUpperCase() + ' Lv.' + player.wlevel, 80, HUD_TOP+90);
 
   // 高能炸弹圆盘按钮
   UI.drawBombButton(ctx, W-50, H-50, 35, player.bombs, player.bombs > 0);
