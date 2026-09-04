@@ -1,8 +1,8 @@
-# 子项目各自独立 git 仓库，根仓库不跟踪其内容
-/lszj/
-/nulei-server/
+# 编辑器与工具产物
+.idea/
+.zcode/
 
-# 系统与编辑器杂物
+# 系统杂物
 Thumbs.db
 desktop.ini
 .DS_Store

@@ -1,17 +1,19 @@
-# personal 工作区
+# nlfb — 《怒雷风暴》
 
-个人项目多项目工作区。根仓库只管理工作区级文件（本 README、`.gitignore`），
-各子项目为独立 git 仓库，已在根 `.gitignore` 中排除，各自管理各自的提交。
+个人项目单仓库（monorepo）：微信小游戏《怒雷风暴》(Nu-Thunder) 及其世界排行榜后端。
 
-## 子项目
+## 目录
 
-| 目录 | 项目 | 说明 |
+| 目录 | 内容 | 说明 |
 |------|------|------|
-| `lszj/` | 《怒雷风暴》(Nu-Thunder) | 个人微信小游戏：竖版街机飞行射击，原生 Canvas 2D，无游戏引擎，靠激励视频/Banner 广告变现。规范见 `lszj/AGENTS.md` |
-| `nulei-server/` | nulei-server | 上述小游戏的世界排行榜后端：纯 Go 标准库单文件实现，数据落 `data/scores.json`，部署于阿里云（nginx 反代 `game.lliyuu520.cn`）。详见 `nulei-server/README.md` |
+| `lszj/` | 微信小游戏客户端 | 竖版街机飞行射击，原生 Canvas 2D（`wx.createCanvas`），无第三方游戏引擎，靠激励视频/Banner 广告变现。项目规范见 `lszj/AGENTS.md` |
+| `nulei-server/` | 世界榜后端 | 纯 Go 标准库单文件实现，数据落 `data/scores.json`（原子写），部署于阿里云（nginx 反代 `game.lliyuu520.cn`）。详见 `nulei-server/README.md` |
 
-## 说明
+好友榜走微信开放数据域（`openDataContext`，零后端），`nulei-server` 只负责世界榜。
 
-- 两个项目同属《怒雷风暴》：`lszj` 是客户端，`nulei-server` 是其世界榜服务端；
-  好友榜走微信开放数据域，不经过后端。
-- 根仓库不要执行 `git add -f` 强行跟踪子项目内容，子项目的提交/分支在各子目录内操作。
+## 仓库约定
+
+- 单仓库包含两个子项目，根 `.gitignore` 排除编辑器/系统杂物；
+  `nulei-server/.gitignore` 继续排除 `bin/ data/`（`data/config.json` 含 appSecret，严禁入库）。
+- 两子项目原独立仓库的历史已通过 vendor 合并保留在主分支中（`lszj`、`nulei-server`
+  的原提交均可通过 merge parent 追溯）。
