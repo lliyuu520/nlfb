@@ -1,0 +1,13 @@
+{
+  "addr": "127.0.0.1:12700",
+  "basePath": "/nulei/api",
+  "appId": "你的小游戏AppID",
+  "appSecret": "在这里填入AppSecret，不要提交到任何仓库",
+  "tokenSecret": "",
+  "maxScore": 9999999,
+  "maxScoreRate": 800,
+  "maxDailyReports": 50,
+  "maxNicknameLen": 12,
+  "tokenDays": 30,
+  "devLogin": false
+}
