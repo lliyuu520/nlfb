@@ -168,11 +168,11 @@ function update(dt){
   const p=player;
   if(p.inv>0)p.inv-=dt;
 
-  // 键盘移动
-  const sp=380;
-  const mx=(keys.ArrowRight||keys.KeyD?1:0)-(keys.ArrowLeft||keys.KeyA?1:0);
-  const my=(keys.ArrowDown||keys.KeyS?1:0)-(keys.ArrowUp||keys.KeyW?1:0);
-  if(mx||my){p.x=clamp(p.x+mx*sp*dt,12,W-12);p.y=clamp(p.y+my*sp*dt,70,H-16);}
+  // 移动逻辑已完全通过 touch 事件处理，此处移除键盘依赖
+  // const sp=380;
+  // const mx=(keys.ArrowRight||keys.KeyD?1:0)-(keys.ArrowLeft||keys.KeyA?1:0);
+  // const my=(keys.ArrowDown||keys.KeyS?1:0)-(keys.ArrowUp||keys.KeyW?1:0);
+  // if(mx||my){p.x=clamp(p.x+mx*sp*dt,12,W-12);p.y=clamp(p.y+my*sp*dt,70,H-16);}
 
   // 玩家开火
   p.fireT-=dt;if(p.fireT<=0){p.fireT=p.weapon==='laser'?0.11:0.09;firePlayer();}
