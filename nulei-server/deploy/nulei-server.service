@@ -1,0 +1,20 @@
+[Unit]
+Description=nulei-server (怒雷风暴世界榜 API)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=nulei
+Group=nulei
+WorkingDirectory=/opt/nulei-server
+ExecStart=/opt/nulei-server/nulei-server -c /opt/nulei-server/data/config.json
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/nulei-server/data
+
+[Install]
+WantedBy=multi-user.target
