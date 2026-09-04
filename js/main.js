@@ -342,39 +342,47 @@ function draw(){
 function overlay(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=scan;ctx.fillRect(0,0,W,H);}
 function drawTitle(){
   ctx.textAlign='center';
-  ctx.fillStyle='#ffd23c';ctx.font='bold 52px monospace';ctx.fillText('怒雷风暴',W/2,240);
-  ctx.fillStyle='#5df0ff';ctx.font='16px monospace';ctx.fillText('NU·THUNDER  —  街机竖版射击原型',W/2,278);
-  ctx.fillStyle='#fff';ctx.font='15px monospace';
-  const tips=['拖动屏幕移动 · 自动开火','点击左下角 = 炸弹（清屏）','红R 追踪弹 · 蓝B 穿透激光','黄Y 追踪导弹 · 紫P 激光炮','白色小点 = 你的判定，很小'];
-  tips.forEach((t,i)=>ctx.fillText(t,W/2,360+i*28));
-  ctx.fillStyle=Math.floor(performance.now()/500)%2?'#fff':'#666';
-  ctx.font='bold 20px monospace';ctx.fillText('点击屏幕开始',W/2,580);
-  ctx.fillStyle='#9ca3af';ctx.font='14px monospace';ctx.fillText('HI-SCORE '+hi,W/2,640);
+  ctx.save();
+  ctx.shadowColor='#00f3ff'; ctx.shadowBlur=25;
+  ctx.fillStyle='#00f3ff'; ctx.font='bold 56px monospace';
+  ctx.fillText('怒雷风暴',W/2,220);
+  ctx.shadowColor='#ff0055'; ctx.shadowBlur=15;
+  ctx.fillStyle='#ff0055'; ctx.font='16px monospace';
+  ctx.fillText('NU · THUNDER  //  CYBER ARCADE SHOOTER',W/2,260);
+  ctx.restore();
+
+  // 炫酷说明面板
+  UI.drawNeonPanel(ctx, 40, 310, W-80, 210, 'MISSION BRIEFING', '#ffe600');
+  ctx.fillStyle='#fff'; ctx.font='14px monospace';
+  const tips=['[ 拖动屏幕 ] 控制战机移动并自动射击','[ 点击左下角 ] 释放高能全屏炸弹','[ 红 R ] 追踪导弹 · [ 蓝 B ] 穿透激光','[ 道具掉落 ] 拾取升级武器与火力','[ 中心小白点 ] 战机核心判定区'];
+  tips.forEach((t,i)=>ctx.fillText(t,W/2,360+i*32));
+
+  ctx.fillStyle=Math.floor(performance.now()/400)%2?'#00f3ff':'#ff0055';
+  ctx.font='bold 22px monospace';ctx.fillText('▶ 点击屏幕开始战斗 ◀',W/2,580);
+
+  ctx.fillStyle='#9ca3af';ctx.font='14px monospace';ctx.fillText('HI-SCORE: '+String(hi).padStart(7,'0'),W/2,640);
 }
 function drawHUD(){
   ctx.setTransform(1,0,0,1,0,0);
   
-  // 使用 UI 库绘制高科技 HUD
-  UI.drawGlassPanel(ctx, 5, 5, 120, 50, 'SCORE');
-  ctx.fillStyle='#fff'; ctx.font='bold 18px monospace';
-  ctx.fillText(String(score).padStart(7,'0'), 15, 40);
+  // 绘制 HUD
+  UI.drawNeonPanel(ctx, 10, 10, 140, 50, 'SCORE', '#00f3ff');
+  ctx.fillStyle='#fff'; ctx.font='bold 22px monospace';
+  ctx.fillText(String(score).padStart(7,'0'), 80, 45);
 
-  UI.drawGlassPanel(ctx, W-105, 5, 100, 50, 'PLAYER');
+  UI.drawNeonPanel(ctx, W-150, 10, 140, 50, 'PLAYER', '#00f3ff');
   ctx.fillStyle='#d8ecff'; ctx.font='bold 16px monospace';
-  ctx.fillText('❤️ x '+player.lives, W-95, 40);
+  ctx.fillText('❤️  x '+player.lives, W-80, 45);
 
-  // 炸弹按钮
-  ctx.fillStyle='rgba(255, 140, 66, 0.8)';
-  ctx.beginPath(); ctx.arc(45, H-45, 35, 0, Math.PI*2); ctx.fill();
-  ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
-  ctx.fillStyle='#000'; ctx.font='bold 16px monospace'; ctx.textAlign='center';
-  ctx.fillText('BOMB', 45, H-40);
-  ctx.fillText(player.bombs, 45, H-25);
+  UI.drawNeonPanel(ctx, 10, 70, 140, 40, 'WEAPON', '#ff0055');
+  ctx.fillStyle='#ff0055'; ctx.font='14px monospace';
+  ctx.fillText(player.weapon.toUpperCase() + ' Lv.' + player.wlevel, 80, 100);
+
+  // 高能炸弹圆盘按钮
+  UI.drawBombButton(ctx, W-50, H-50, 35, player.bombs, player.bombs > 0);
 
   if(boss){
-    UI.drawGlassPanel(ctx, 40, H-60, W-80, 20, 'BOSS HP');
-    ctx.fillStyle='#ff3b3b'; 
-    ctx.fillRect(45, H-50, (W-90)*Math.max(0,boss.hp/boss.maxhp), 5);
+    UI.drawBossBar(ctx, W, H, boss.hp, boss.maxhp);
   }
 }
 
