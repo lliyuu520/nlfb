@@ -336,7 +336,7 @@ function draw(){
   if(state==='over'){ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);
     ctx.fillStyle='#ff5d5d';ctx.font='bold 44px monospace';ctx.textAlign='center';ctx.fillText('GAME OVER',W/2,H/2-20);
     ctx.fillStyle='#fff';ctx.font='18px monospace';ctx.fillText(`得分 ${score}`,W/2,H/2+20);
-    ctx.fillStyle='#9ca3af';ctx.font='14px monospace';ctx.fillText('点击 / 回车 重新开始',W/2,H/2+52);}
+    ctx.fillStyle='#9ca3af';ctx.font='14px monospace';ctx.fillText('点击屏幕重新开始',W/2,H/2+52);}
   overlay();
 }
 function overlay(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=scan;ctx.fillRect(0,0,W,H);}
@@ -345,10 +345,10 @@ function drawTitle(){
   ctx.fillStyle='#ffd23c';ctx.font='bold 52px monospace';ctx.fillText('怒雷风暴',W/2,240);
   ctx.fillStyle='#5df0ff';ctx.font='16px monospace';ctx.fillText('NU·THUNDER  —  街机竖版射击原型',W/2,278);
   ctx.fillStyle='#fff';ctx.font='15px monospace';
-  const tips=['方向键/WASD/拖动 移动 · 自动开火','空格 = 炸弹（清屏）','红R 追踪弹 · 蓝B 穿透激光','黄Y 追踪导弹 · 紫P 激光炮','白色小点 = 你的判定，很小'];
+  const tips=['拖动屏幕移动 · 自动开火','点击左下角 = 炸弹（清屏）','红R 追踪弹 · 蓝B 穿透激光','黄Y 追踪导弹 · 紫P 激光炮','白色小点 = 你的判定，很小'];
   tips.forEach((t,i)=>ctx.fillText(t,W/2,360+i*28));
   ctx.fillStyle=Math.floor(performance.now()/500)%2?'#fff':'#666';
-  ctx.font='bold 20px monospace';ctx.fillText('点击 / 回车 开始',W/2,580);
+  ctx.font='bold 20px monospace';ctx.fillText('点击屏幕开始',W/2,580);
   ctx.fillStyle='#9ca3af';ctx.font='14px monospace';ctx.fillText('HI-SCORE '+hi,W/2,640);
 }
 function drawHUD(){
