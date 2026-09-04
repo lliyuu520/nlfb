@@ -25,11 +25,18 @@
       "outputPath": ""
     }
   },
-  "appid": "wx0610fae0dd676769",
+  "appid": "wx7e91be6ebae5f2d1",
   "compileType": "game",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "folder", "value": "assets/logo" },
+      { "type": "folder", "value": "pic" },
+      { "type": "folder", "value": "docs" },
+      { "type": "file", "value": "remove_wm.py" },
+      { "type": "file", "value": "AGENTS.md" },
+      { "type": "file", "value": "version.json" }
+    ],
     "include": []
   },
   "isGameTourist": false,

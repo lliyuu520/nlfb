@@ -1,4 +1,5 @@
 // ui.js - 怒雷风暴高能霓虹科技风 UI 组件库
+let _bossGrad = null; // Boss 血条渐变缓存（横轴渐变，创建一次复用，避免每帧重建对象）
 const UI = {
   // 绘制圆角矩形
   roundedRect(ctx, x, y, w, h, r) {
@@ -71,7 +72,7 @@ const UI = {
     ctx.font = 'bold 12px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('BOMB', x, y - 7);
+    ctx.fillText('炸弹', x, y - 7);
 
     ctx.fillStyle = '#ffe600';
     ctx.font = 'bold 16px monospace';
@@ -98,14 +99,16 @@ const UI = {
     ctx.fill();
     ctx.stroke();
 
-    // 渐变血量填充
+    // 渐变血量填充（渐变对象缓存）
     const ratio = Math.max(0, hp / maxhp);
     if (ratio > 0) {
-      const grad = ctx.createLinearGradient(bx, by, bx + barW, by);
-      grad.addColorStop(0, '#ff0055');
-      grad.addColorStop(0.5, '#ff7700');
-      grad.addColorStop(1, '#ffe600');
-      ctx.fillStyle = grad;
+      if (!_bossGrad) {
+        _bossGrad = ctx.createLinearGradient(bx, by, bx + barW, by);
+        _bossGrad.addColorStop(0, '#ff0055');
+        _bossGrad.addColorStop(0.5, '#ff7700');
+        _bossGrad.addColorStop(1, '#ffe600');
+      }
+      ctx.fillStyle = _bossGrad;
       this.roundedRect(ctx, bx + 2, by + 2, (barW - 4) * ratio, barH - 4, 3);
       ctx.fill();
     }
@@ -114,7 +117,7 @@ const UI = {
     ctx.fillStyle = '#ff3366';
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('⚡ WARNING: CORE TARGET ⚡', w / 2, by - 6);
+    ctx.fillText('⚡ 警告：核心目标 ⚡', w / 2, by - 6);
     ctx.restore();
   }
 };
