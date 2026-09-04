@@ -1,5 +1,6 @@
 
 "use strict";
+const UI = require('./ui.js');
 const cv=wx.createCanvas(),ctx=cv.getContext('2d');
 const W=480,H=800;
 function fit(){}
@@ -195,8 +196,8 @@ function update(dt){
     for(const e of enemies){if((b.x-e.x)**2+(b.y-e.y)**2<(b.r+e.r)**2){hit=e;break;}}
     if(!hit&&boss&&(b.x-boss.x)**2+(b.y-boss.y)**2<(b.r+boss.r)**2)hit=boss;
     if(hit){
-      if(b.pierce){if(!b.hits.has(hit.id||'boss')){b.hits.add(hit.id||'boss');hit.hp-=b.dmg;spark(b.x,b.y,b.color,3);}}
-      else{hit.hp-=b.dmg;spark(b.x,b.y,b.color,4);bullets.splice(i,1);}
+      if(b.pierce){if(!b.hits.has(hit.id||'boss')){b.hits.add(hit.id||'boss');hit.hp-=b.dmg;hit.flash=0.1;spark(b.x,b.y,b.color,3);}}
+      else{hit.hp-=b.dmg;hit.flash=0.1;spark(b.x,b.y,b.color,4);bullets.splice(i,1);}
     }
   }
 
@@ -213,23 +214,27 @@ function update(dt){
   }
 
   // Boss
-  if(boss){const b=boss;b.t+=dt;
-    if(b.y<140){b.y+=60*dt;}
-    else{
-      b.x=W/2+Math.sin(b.t*0.7)*(W/2-90);
-      const rage=b.hp<b.maxhp*0.5;
-      b.fireT-=dt;
-      if(b.fireT<=0){b.fireT=rage?1.0:1.4; // 扇形弹幕
-        const n=rage?12:9;for(let i=0;i<n;i++)eShoot(b.x,b.y+20,Math.PI/2+(i-(n-1)/2)*0.22,170);}
-      b.aimT-=dt;
-      if(b.aimT<=0){b.aimT=rage?1.5:2.4;shootAimed(b.x,b.y+20,rage?5:3,240,0.16);}
-      if(rage){b.spiralT-=dt; // 狂暴螺旋
-        if(b.spiralT<=0){b.spiralT=0.08;b.spiralA+=0.42;
-          eShoot(b.x,b.y,b.spiralA,150,'#ff9d3c');eShoot(b.x,b.y,b.spiralA+Math.PI,150,'#ff9d3c');}}
+  // Boss 逻辑补充（之前被误删的逻辑）
+  if(boss){
+    boss.t += dt;
+    if(boss.y < 140) boss.y += 60 * dt;
+    else {
+      boss.x = W/2 + Math.sin(boss.t * 0.7) * (W/2 - 90);
+      const rage = boss.hp < boss.maxhp * 0.5;
+      boss.fireT -= dt;
+      if(boss.fireT <= 0){ boss.fireT = rage ? 1.0 : 1.4;
+        const n = rage ? 12 : 9; for(let i=0; i<n; i++) eShoot(boss.x, boss.y + 20, Math.PI/2 + (i-(n-1)/2)*0.22, 170);
+      }
+      boss.aimT -= dt;
+      if(boss.aimT <= 0){ boss.aimT = rage ? 1.5 : 2.4; shootAimed(boss.x, boss.y + 20, rage ? 5 : 3, 240, 0.16); }
+      if(rage){ boss.spiralT -= dt;
+        if(boss.spiralT <= 0){ boss.spiralT = 0.08; boss.spiralA += 0.42;
+          eShoot(boss.x, boss.y, boss.spiralA, 150, '#ff9d3c'); eShoot(boss.x, boss.y, boss.spiralA + Math.PI, 150, '#ff9d3c'); }
+      }
     }
-    if(b.hp<=0){score+=5000;explode(b.x,b.y,true);explode(b.x-30,b.y+20,true);explode(b.x+30,b.y-10,true);
-      boss=null;ebullets=[];state='clear';clearT=2.2;flash=0.5;}
-    else if(p.inv<=0&&b.y>0&&(b.x-p.x)**2+(b.y-p.y)**2<(b.r+p.r)**2)hurtPlayer();
+    if(boss.hp <= 0){ score += 5000; explode(boss.x, boss.y, true); explode(boss.x-30, boss.y+20, true); explode(boss.x+30, boss.y-10, true);
+      boss = null; ebullets = []; state = 'clear'; clearT = 2.2; flash = 0.5; }
+    else if(p.inv <= 0 && boss.y > 0 && (boss.x-p.x)**2+(boss.y-p.y)**2 < (boss.r+p.r)**2) hurtPlayer();
   }
 
   // 敌弹
@@ -274,13 +279,17 @@ function drawShip(){
 }
 function drawEnemy(e){
   ctx.save();ctx.translate(e.x,e.y);
-  if(e.type==='grunt'){ctx.fillStyle='#e0555f';ctx.beginPath();ctx.moveTo(0,10);ctx.lineTo(-11,-8);ctx.lineTo(0,-3);ctx.lineTo(11,-8);ctx.closePath();ctx.fill();
+  if(e.flash > 0) e.flash -= 0.05;
+  const col = e.flash > 0 ? '#ffffff' : (
+    e.type==='grunt'?'#e0555f':e.type==='weaver'?'#b06ae0':e.type==='diver'?'#ff8c42':'#6b7280'
+  );
+  if(e.type==='grunt'){ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(0,10);ctx.lineTo(-11,-8);ctx.lineTo(0,-3);ctx.lineTo(11,-8);ctx.closePath();ctx.fill();
     ctx.fillStyle='#ffd0d0';ctx.fillRect(-2,-4,4,4);}
-  else if(e.type==='weaver'){ctx.fillStyle='#b06ae0';ctx.beginPath();ctx.ellipse(0,0,13,8,0,0,7);ctx.fill();
+  else if(e.type==='weaver'){ctx.fillStyle=col;ctx.beginPath();ctx.ellipse(0,0,13,8,0,0,7);ctx.fill();
     ctx.fillStyle='#f0d0ff';ctx.beginPath();ctx.arc(0,0,4,0,7);ctx.fill();}
   else if(e.type==='diver'){ctx.rotate(Math.atan2(player.y-e.y,player.x-e.x)+Math.PI/2);
-    ctx.fillStyle='#ff8c42';ctx.beginPath();ctx.moveTo(0,12);ctx.lineTo(-9,-9);ctx.lineTo(0,-4);ctx.lineTo(9,-9);ctx.closePath();ctx.fill();}
-  else if(e.type==='turret'){ctx.fillStyle='#6b7280';ctx.fillRect(-14,-8,28,16);
+    ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(0,12);ctx.lineTo(-9,-9);ctx.lineTo(0,-4);ctx.lineTo(9,-9);ctx.closePath();ctx.fill();}
+  else if(e.type==='turret'){ctx.fillStyle=col;ctx.fillRect(-14,-8,28,16);
     ctx.fillStyle='#9ca3af';ctx.fillRect(-4,-14,8,10);ctx.fillStyle='#ff5d5d';ctx.beginPath();ctx.arc(0,0,4,0,7);ctx.fill();}
   ctx.restore();
 }
@@ -344,23 +353,29 @@ function drawTitle(){
 }
 function drawHUD(){
   ctx.setTransform(1,0,0,1,0,0);
-  // HUD 背景
-  ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fillRect(0,0,W,60);
-  ctx.textAlign='left';ctx.font='bold 16px monospace';ctx.fillStyle='#fff';
-  ctx.fillText(String(score).padStart(7,'0'),10,24);
-  ctx.textAlign='center';ctx.fillStyle='#ffd23c';ctx.fillText('HI '+String(Math.max(hi,score)).padStart(7,'0'),W/2,24);
-  ctx.textAlign='right';ctx.fillStyle='#d8ecff';ctx.fillText('❤️'+player.lives,W-10,24);
   
-  // 炸弹按钮（移动端交互）
-  ctx.fillStyle='#ff8c42';ctx.beginPath();ctx.arc(40,H-40,30,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#000';ctx.font='bold 14px monospace';ctx.textAlign='center';
-  ctx.fillText('💣'+player.bombs,40,H-35);
+  // 使用 UI 库绘制高科技 HUD
+  UI.drawGlassPanel(ctx, 5, 5, 120, 50, 'SCORE');
+  ctx.fillStyle='#fff'; ctx.font='bold 18px monospace';
+  ctx.fillText(String(score).padStart(7,'0'), 15, 40);
 
-  ctx.textAlign='left';ctx.fillStyle='#8fa3c0';ctx.font='12px monospace';
-  const wname={std:'标准炮',homing:'追踪弹',laser:'激光'}[player.weapon];
-  ctx.fillText(`STAGE${stage} ${wname}Lv${player.wlevel}${player.mis!=='none'?' 导弹Lv'+player.mlevel:''}`,10,44);
-  if(boss){ctx.fillStyle='#333';ctx.fillRect(60,54,W-120,6);
-    ctx.fillStyle='#ff3b3b';ctx.fillRect(60,54,(W-120)*Math.max(0,boss.hp/boss.maxhp),6);}
+  UI.drawGlassPanel(ctx, W-105, 5, 100, 50, 'PLAYER');
+  ctx.fillStyle='#d8ecff'; ctx.font='bold 16px monospace';
+  ctx.fillText('❤️ x '+player.lives, W-95, 40);
+
+  // 炸弹按钮
+  ctx.fillStyle='rgba(255, 140, 66, 0.8)';
+  ctx.beginPath(); ctx.arc(45, H-45, 35, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#000'; ctx.font='bold 16px monospace'; ctx.textAlign='center';
+  ctx.fillText('BOMB', 45, H-40);
+  ctx.fillText(player.bombs, 45, H-25);
+
+  if(boss){
+    UI.drawGlassPanel(ctx, 40, H-60, W-80, 20, 'BOSS HP');
+    ctx.fillStyle='#ff3b3b'; 
+    ctx.fillRect(45, H-50, (W-90)*Math.max(0,boss.hp/boss.maxhp), 5);
+  }
 }
 
 // ---------- 主循环 ----------
@@ -368,6 +383,9 @@ let last=performance.now();
 function loop(now){
   const dt=Math.min(0.05,(now-last)/1000);last=now;
   for(const s of stars){s.y+=s.v*dt*(state==='playing'?1:0.3);if(s.y>H){s.y=-2;s.x=Math.random()*W;}}
+  
+  if(state === 'playing') spawnT = Math.max(0.4, spawnT - dt * 0.02);
+  
   update(dt);draw();
   requestAnimationFrame(loop);
 }
