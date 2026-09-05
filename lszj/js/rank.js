@@ -38,7 +38,7 @@ const FOOT_L = { x: PANEL.x + 16, y: PANEL.y + 460, w: 56, h: 34 };
 const FOOT_R = { x: PANEL.x + PANEL.w - 72, y: PANEL.y + 460, w: 56, h: 34 };
 const CONTENT = { x: PANEL.x + 24, y: PANEL.y + 140, w: PANEL.w - 48, h: PAGE * 44 };
 
-// 面板整块按底部遮挡区（Banner / 刘海屏手势条）上移，子控件与内容区同步平移，
+// 面板整块按底部遮挡区（刘海屏手势条）上移，子控件与内容区同步平移，
 // 保证绘制位置与点击判定一致（每次 draw 前重排）
 let insetFn = () => 0;
 function layout(bottomInset, gameH) {

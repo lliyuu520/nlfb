@@ -81,7 +81,7 @@ const UI = {
     ctx.restore();
   },
 
-  // 绘制炫酷 Boss 血条（bottomInset：底部被 Banner / 手势条占据的高度，血条需在其上方）
+  // 绘制炫酷 Boss 血条（bottomInset：底部被手势条占据的高度，血条需在其上方）
   drawBossBar(ctx, w, h, hp, maxhp, bottomInset) {
     const inset = bottomInset || 0;
     const barW = w - 80;

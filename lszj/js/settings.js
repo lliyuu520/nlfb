@@ -63,7 +63,7 @@ function wrap(ctx,s,x,y,maxW,lh){
 function hit(x,y,w,h,fn,inContent,inMenu){ hits.push({x,y,w,h,fn,c:!!inContent,m:!!inMenu}); }
 
 // ---------- 布局 ----------
-// 页眉固定于顶部（刘海下方），主体分为左菜单列与右内容列，底部让出 Banner / 手势条
+// 页眉固定于顶部（刘海下方），主体分为左菜单列与右内容列，底部让出手势条
 function layout(W,H,safeTop,bottomInset){
   const headY = safeTop + 8, headH = 44;
   const bodyY = headY + headH + 12;
@@ -374,7 +374,7 @@ function drawAbout(ctx, d, C){
   }
   ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '11px monospace';
   y = wrap(ctx, '存档保存在本机（微信本地存储），换设备不互通；破纪录时排行榜得分自动上报。', x, y+14, w, 18);
-  return wrap(ctx, '本作含激励视频与 Banner 广告：看广告可复活、翻倍金币、领取金币，广告不影响战斗数值。', x, y+8, w, 18);
+  return wrap(ctx, '本作含激励视频广告（玩家主动触发）：看广告可复活、翻倍金币、领取金币，广告不影响战斗数值。', x, y+8, w, 18);
 }
 function count(arr){
   if (!arr || !arr.length) return 0;
