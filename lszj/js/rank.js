@@ -38,6 +38,17 @@ const FOOT_L = { x: PANEL.x + 16, y: PANEL.y + 460, w: 56, h: 34 };
 const FOOT_R = { x: PANEL.x + PANEL.w - 72, y: PANEL.y + 460, w: 56, h: 34 };
 const CONTENT = { x: PANEL.x + 24, y: PANEL.y + 140, w: PANEL.w - 48, h: PAGE * 44 };
 
+// 面板整块按底部遮挡区（Banner / 刘海屏手势条）上移，子控件与内容区同步平移，
+// 保证绘制位置与点击判定一致（每次 draw 前重排）
+let insetFn = () => 0;
+function layout(bottomInset, gameH) {
+  const y = Math.min(PANEL.y, gameH - PANEL.h - (bottomInset || 0) - 12);
+  const dy = y - PANEL.y;
+  if (!dy) return;
+  PANEL.y = y;
+  for (const b of [CLOSE, RENAME, FOOT_L, FOOT_R, CONTENT, ...TABS]) b.y += dy;
+}
+
 const inRect = (t, b) => t.x >= b.x && t.x <= b.x + b.w && t.y >= b.y && t.y <= b.y + b.h;
 const rankColor = r => r === 1 ? COL.gold : r === 2 ? '#c8d3ff' : r === 3 ? '#ffaa66' : COL.dim;
 
@@ -45,6 +56,7 @@ function setup(o) {
   if (!o) return;
   sx = o.sx || 1; sy = o.sy || 1;
   onClose = o.onClose || null;
+  if (typeof o.bottomInset === 'function') insetFn = o.bottomInset;
 }
 
 // ---------- HTTP ----------
@@ -210,6 +222,7 @@ function drawFriendRows(ctx) {
 }
 
 function draw(ctx, W, H) {
+  layout(insetFn(), H); // 先按底部遮挡区重排，再绘制
   ctx.setTransform(sx, 0, 0, sy, 0, 0);
   ctx.fillStyle = 'rgba(2,4,10,0.72)'; ctx.fillRect(0, 0, W, H);
   const glow = tab === 'friend' ? COL.cyan : COL.pink;

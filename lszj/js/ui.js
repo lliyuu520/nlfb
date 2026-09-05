@@ -39,6 +39,7 @@ const UI = {
     if (title) {
       ctx.fillStyle = glowColor;
       ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; // 固定对齐：调用方常处于 textAlign='center'，泄漏会把标题画到框外
       ctx.fillText(title, x + 10, y + 15);
     }
     ctx.restore();
@@ -80,12 +81,13 @@ const UI = {
     ctx.restore();
   },
 
-  // 绘制炫酷 Boss 血条
-  drawBossBar(ctx, w, h, hp, maxhp) {
+  // 绘制炫酷 Boss 血条（bottomInset：底部被 Banner / 手势条占据的高度，血条需在其上方）
+  drawBossBar(ctx, w, h, hp, maxhp, bottomInset) {
+    const inset = bottomInset || 0;
     const barW = w - 80;
     const barH = 14;
     const bx = 40;
-    const by = h - 55;
+    const by = h - inset - 55;
 
     ctx.save();
     ctx.shadowColor = '#ff0055';

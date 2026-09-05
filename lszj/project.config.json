@@ -38,6 +38,8 @@
       { "type": "folder", "value": "drafts" },
       { "type": "folder", "value": "promo_work" },
       { "type": "folder", "value": "tools" },
+      { "type": "file", "value": "assets/audio/bgm.mp3" },
+      { "type": "file", "value": "assets/audio/bgm.wav" },
       { "type": "file", "value": "remove_wm.py" },
       { "type": "file", "value": "cut_sprites.py" },
       { "type": "file", "value": "AGENTS.md" },
