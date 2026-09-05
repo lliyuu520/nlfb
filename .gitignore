@@ -1,6 +1,16 @@
+# 密钥与本地配置
+.env
+
 # 编辑器与工具产物
 .idea/
 .zcode/
+__pycache__/
+
+# 临时产物（可删，仅不入库）
+/master.tar.gz
+/ad_ref_0.jpg
+lszj/promo_work/_tmp.jpg
+lszj/promo_work/preview_*.png
 
 # 系统杂物
 Thumbs.db

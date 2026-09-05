@@ -16,4 +16,4 @@
 ## Git 约定
 
 - 提交 scope 对应子目录：`feat(lszj): …`、`fix(nulei-server): …`；跨两端改动不带 scope。
-- `lszj/.zcode/config.json` 是有意的项目级 MCP 配置，保持跟踪；`.zcode/` 其余内容已忽略。
+- 项目级 MCP 配置在工作区根 `.zcode/config.json`（本地使用，`.zcode/` 整体不入库）；原 `lszj/.zcode/` 下的同名配置已移除。
