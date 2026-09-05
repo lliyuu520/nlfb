@@ -153,7 +153,8 @@ const TIPS=['[ 拖动屏幕 ] 控制战机移动并自动射击','[ 点击右下
 const SET_BTN={x:W-92,y:HUD_TOP+4,w:80,h:40}; // 主页右上角设置入口（打开独立设置页）
 const RANK_BTN={x:20,y:HUD_TOP+4,w:80,h:40}; // 主页左上角排行榜入口（与设置入口镜像）
 const SND_BTN={x:W/2-40,y:HUD_TOP+4,w:80,h:40}; // 主页顶部居中：全局声音总开关（SFX+BGM 一键全关/全开）
-const MUTE_BTN={x:W-48,y:HUD_TOP-4,w:46,h:32}; // 战斗中右上角小喇叭：随时一键全静音/恢复（与主页开关同一状态）
+// 战斗中静音按钮放左下角（与右下角炸弹按钮镜像）：右上角是微信胶囊按钮地盘，放那儿会被盖住还可能误触退出菜单
+const mutePos=()=>({x:30,y:H-30-bottomInset()}); // 与 drawHUD 中的小喇叭位置保持一致
 const REWARD_COINS=50; // 每次完整观看激励视频奖励金币
 const VERSION='0.0.2'; // 与 version.json 的 latest 保持一致（设置页"关于"展示）
 // 升级项预留：数值效果已接入掉率(dropItem)与伤害(update/useBomb)，商店 UI 上线后调 buyUpgrade 即可
@@ -219,6 +220,7 @@ Settings.setup({
 });
 
 let drag=null;
+let dbgTap=null; // TEMP DEBUG: 触摸坐标校准准星，校准后删除
 // 双击暂停检测：两次"干净点按"（快速按下-抬起且未移动）间隔 <350ms 且位置相近
 let tStart=0,tStartX=0,tStartY=0,tMoved=false;
 let lastTapT=0,lastTapX=0,lastTapY=0;
@@ -226,10 +228,12 @@ wx.onTouchStart(e => {
   const touch = e.touches[0];
   if (!touch) return;
   const t = toGame(touch);
+  dbgTap={x:t.x,y:t.y,t:30}; // TEMP DEBUG
   if (Ads.onTouchStart(t)) return; // 模拟广告展示中：点击只作用于广告层
   if (state === 'playing') {
-    // 静音按钮（右上角小喇叭）：先于拖动判定吞掉点按，不带动机体移动
-    if (inRect(t, MUTE_BTN)) { const on = Sfx.toggleAll(); if (on) Sfx.play('click'); return; }
+    // 静音按钮（左下角小喇叭）：先于拖动判定吞掉点按，不带动机体移动
+    const mp=mutePos();
+    if ((t.x-mp.x)**2+(t.y-mp.y)**2 < 36**2) { const on = Sfx.toggleAll(); if (on) Sfx.play('click'); return; }
     // 炸弹按钮（屏幕右下角圆盘，随手势条高度上移）
     const bp=bombPos();
     if ((t.x-bp.x)**2+(t.y-bp.y)**2 < BOMB_R**2) { useBomb(); return; }
@@ -862,6 +866,7 @@ function draw(){
     ctx.fillStyle='#ffe600';ctx.font='bold 14px monospace';ctx.textAlign='center';
     ctx.fillText(msg,W/2,H/2+188);ctx.restore();
   }
+  if(dbgTap){ctx.save();ctx.strokeStyle='#00ff00';ctx.lineWidth=2;ctx.beginPath();ctx.arc(dbgTap.x,dbgTap.y,14,0,7);ctx.stroke();ctx.fillStyle='#00ff00';ctx.font='bold 16px monospace';ctx.textAlign='left';ctx.fillText(Math.round(dbgTap.x)+','+Math.round(dbgTap.y),dbgTap.x+18,dbgTap.y);ctx.restore();} // TEMP DEBUG
   overlay();
   Ads.draw(ctx); // 模拟激励视频为覆盖层，最后绘制压在所有 UI 之上
 }
@@ -977,8 +982,8 @@ function drawHUD(){
   const bp=bombPos();
   UI.drawBombButton(ctx, bp.x, bp.y, 35, player.bombs, player.bombs > 0);
 
-  // 右上角静音喇叭（仅战斗中显示与响应，结算/暂停页不出现避免误触死区）
-  if (state === 'playing') drawSpeaker(W-26, HUD_TOP+12, Sfx.sfxOn && Sfx.bgmOn);
+  // 左下角静音喇叭（仅战斗中显示与响应，结算/暂停页不出现避免误触死区）
+  if (state === 'playing'){ const mp=mutePos(); drawSpeaker(mp.x, mp.y, Sfx.sfxOn && Sfx.bgmOn); }
 
   if(boss){
     UI.drawBossBar(ctx, W, H, boss.hp, boss.maxhp, bottomInset());
@@ -991,6 +996,7 @@ function loop(){
   const nowMs=Date.now();
   const dt=Math.min(0.05,(nowMs-last)/1000);last=nowMs;
   if(msgT>0)msgT-=dt;
+  if(dbgTap&&(dbgTap.t-=dt)<=0)dbgTap=null; // TEMP DEBUG
   for(const s of stars){s.y+=s.v*dt*(state==='playing'?1:0.3);if(s.y>H){s.y=-2;s.x=Math.random()*W;}}
   // 纯视觉特效时钟：与游戏状态无关，顿帧/暂停期间也持续走（链条爆、冲击波、流星）
   for(let i=chainBooms.length-1;i>=0;i--){const c=chainBooms[i];c.t-=dt;
