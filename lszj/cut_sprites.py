@@ -60,7 +60,7 @@ def extract_alpha(bgr, bg_tol=60, min_island_frac=0.0005, edge_erode=1, feather=
     alpha = cv2.GaussianBlur(alpha, (feather * 2 + 1, feather * 2 + 1), 0)
     return alpha
 
-def cut_items(rgba, min_item_frac=0.003, pad=12, close_k=15):
+def cut_items(rgba, min_item_frac=0.003, pad=12, close_k=15, split_ratio=0.15, wide_split=False):
     """按连通域切单体，返回 [(x0,y0,x1,y1)] 列表"""
     h, w = rgba.shape[:2]
     solid = (rgba[:, :, 3] > 40).astype(np.uint8)
@@ -79,9 +79,33 @@ def cut_items(rgba, min_item_frac=0.003, pad=12, close_k=15):
         boxes.append((x0, y0, x1, y1))
     # 从左到右、从上到下排序
     boxes.sort(key=lambda b: (b[1] // 100, b[0]))
-    return boxes
 
-def process(src, out_dir, base_name, bg_tol=60, bg_open=0, close_k=15):
+    # 粘连二分：wide_split 时按宽度阈值(>0.35w)，否则按密度谷值
+    def split_wide(box):
+        x0, y0, x1, y1 = box
+        if wide_split:
+            if x1 - x0 < int(w * 0.35):
+                return [box]
+            col_density = solid[y0:y1, x0:x1].sum(axis=0).astype(float)
+            lo, hi = int((x1 - x0) * 0.3), int((x1 - x0) * 0.7)
+            mid = lo + int(np.argmin(col_density[lo:hi]))
+            return [(x0, y0, x0 + mid, y1), (x0 + mid, y0, x1, y1)]
+        col_density = solid[y0:y1, x0:x1].sum(axis=0).astype(float)
+        if col_density.max() <= 0 or x1 - x0 < 60:
+            return [box]
+        lo, hi = int((x1 - x0) * 0.3), int((x1 - x0) * 0.7)
+        seg = col_density[lo:hi]
+        mid = lo + int(np.argmin(seg))
+        if seg.min() > col_density.max() * split_ratio:  # 谷值不够深，是同一物体
+            return [box]
+        return [(x0, y0, x0 + mid, y1), (x0 + mid, y0, x1, y1)]
+
+    out = []
+    for b in boxes:
+        out.extend(split_wide(b))
+    return out
+
+def process(src, out_dir, base_name, bg_tol=60, bg_open=0, close_k=15, split_ratio=0.15, wide_split=False):
     bgr = imread_unicode(src)
     if bgr is None:
         print(f"SKIP unreadable: {src}")
@@ -96,7 +120,7 @@ def process(src, out_dir, base_name, bg_tol=60, bg_open=0, close_k=15):
     imwrite_unicode(os.path.join(out_dir, f"{base_name}-透明底整图.png"), rgba)
 
     # 单体切图
-    boxes = cut_items(rgba, close_k=close_k)
+    boxes = cut_items(rgba, close_k=close_k, split_ratio=split_ratio, wide_split=wide_split)
     for idx, (x0, y0, x1, y1) in enumerate(boxes, 1):
         crop = rgba[y0:y1, x0:x1]
         imwrite_unicode(os.path.join(out_dir, f"{base_name}-{idx:02d}.png"), crop)
@@ -106,10 +130,11 @@ if __name__ == "__main__":
     src_dir, out_dir = sys.argv[1], sys.argv[2]
     os.makedirs(out_dir, exist_ok=True)
     jobs = [
-        ("怒雷风暴-素材-玩家战机分级.png", "战机分级", dict(bg_tol=35, bg_open=5, close_k=9)),
+        ("怒雷风暴-素材-玩家战机分级.png", "战机分级", dict(bg_tol=35, bg_open=5, close_k=9, wide_split=True)),
         ("怒雷风暴-素材-Buff道具v2.png", "Buff道具", dict()),
         ("怒雷风暴-素材-掉落物.png", "掉落物", dict()),
         ("怒雷风暴-素材-Boss设计.png", "Boss", dict(bg_tol=50, bg_open=7, close_k=31)),
+        ("怒雷风暴-素材-杂兵敌机.png", "敌机", dict(bg_tol=40, bg_open=5, split_ratio=0)),  # 四象限互离，关闭谷值切分防鞍形机误切
     ]
     for fname, base, kw in jobs:
         p = os.path.join(src_dir, fname)

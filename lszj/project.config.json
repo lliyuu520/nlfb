@@ -31,9 +31,15 @@
   "packOptions": {
     "ignore": [
       { "type": "folder", "value": "assets/logo" },
+      { "type": "folder", "value": "assets/sprites" },
+      { "type": "folder", "value": "assets/promo" },
       { "type": "folder", "value": "pic" },
       { "type": "folder", "value": "docs" },
+      { "type": "folder", "value": "drafts" },
+      { "type": "folder", "value": "promo_work" },
+      { "type": "folder", "value": "tools" },
       { "type": "file", "value": "remove_wm.py" },
+      { "type": "file", "value": "cut_sprites.py" },
       { "type": "file", "value": "AGENTS.md" },
       { "type": "file", "value": "version.json" }
     ],

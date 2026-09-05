@@ -1,6 +1,11 @@
 {
-  "latest": "0.0.1",
+  "latest": "0.0.2",
   "history": [
+    {
+      "version": "0.0.2",
+      "date": "2026-09-05",
+      "desc": "修复真机启动崩溃：基础库无全局 performance 导致卡加载页，计时统一改用 Date.now()"
+    },
     {
       "version": "0.0.1",
       "date": "2026-09-05",
