@@ -60,10 +60,13 @@ function fit(){}
 
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const rnd=(a,b)=>a+Math.random()*(b-a);
+// storage 容错包装：读档/存档抛异常（存储满、基础库异常）不允许带崩冷启动或整局流程
+const lsGet=(k,d)=>{try{const v=wx.getStorageSync(k);return(v===''||v==null)?d:v;}catch(e){return d;}};
+const lsSet=(k,v)=>{try{wx.setStorageSync(k,v);}catch(e){}};
 
 
 // ---------- 全局状态 ----------
-let state='title',stage=1,score=0,hi=+(wx.getStorageSync('nulei_hi')||0);
+let state='title',stage=1,score=0,hi=+(lsGet('nulei_hi',0))||0;
 let elapsed=0,runTime=0,spawnT=1,boss=null,clearT=0,shake=0,flash=0,miniSpawned=false,warnT=0,hitStop=0;
 const BOSS_AT=55; // 常规关卡 Boss 出现时间（秒），HUD 倒计时与刷怪逻辑共用
 const BOSS_MINI_AT=25; // 小 Boss（精英）出场时间（秒），第2关起每关一次
@@ -135,7 +138,7 @@ function revive(){
 }
 
 // ---------- 金币与升级（看广告领金币；掉率/火力升级预留） ----------
-let coins=Number(wx.getStorageSync('nulei_coins'))||0;
+let coins=Number(lsGet('nulei_coins',0))||0;
 // ---------- 主页设置：玩法说明 / 金币与广告 / 更换战机 / 更换背景 ----------
 const SHIPS=[ // 机体皮肤：同款外形不同涂装（设置预览与游戏内共用 drawShipShape）
   {name:'怒雷号',body:'#d8ecff',fin:'#3f8fd6',trail:'#ffb347'},
@@ -147,17 +150,17 @@ const BGS=[ // 背景主题：底色 + 三层星空配色（底色拉开色相�
   {name:'星云紫',bg:'#140a2e',stars:['#4e3a80','#7a63c4','#b892ff']},
   {name:'翡翠绿',bg:'#06281a',stars:['#2a6647','#3f9e68','#82e8ac']},
 ];
-let shipIdx=wx.getStorageSync('nulei_ship')||0;if(!(shipIdx>=0&&shipIdx<SHIPS.length))shipIdx=0;
-let bgIdx=wx.getStorageSync('nulei_bg')||0;if(!(bgIdx>=0&&bgIdx<BGS.length))bgIdx=0;
-const saveShip=()=>wx.setStorageSync('nulei_ship',shipIdx);
-const saveBg=()=>wx.setStorageSync('nulei_bg',bgIdx);
+let shipIdx=lsGet('nulei_ship',0)||0;if(!(shipIdx>=0&&shipIdx<SHIPS.length))shipIdx=0;
+let bgIdx=lsGet('nulei_bg',0)||0;if(!(bgIdx>=0&&bgIdx<BGS.length))bgIdx=0;
+const saveShip=()=>lsSet('nulei_ship',shipIdx);
+const saveBg=()=>lsSet('nulei_bg',bgIdx);
 const SHIP_PRICE=[0,800,1500],BG_PRICE=[0,400,800]; // 皮肤/背景解锁价（0=免费），下标与 SHIPS/BGS 对应
-let owned=Object.assign({ships:[true,false,false],bgs:[true,false,false]},wx.getStorageSync('nulei_owned')||{});
+let owned=Object.assign({ships:[true,false,false],bgs:[true,false,false]},lsGet('nulei_owned',{}));
 if(!Array.isArray(owned.ships)||owned.ships.length!==SHIPS.length)owned.ships=SHIPS.map((_,i)=>i===0);
 if(!Array.isArray(owned.bgs)||owned.bgs.length!==BGS.length)owned.bgs=BGS.map((_,i)=>i===0);
 if(!owned.ships[shipIdx])shipIdx=0;
 if(!owned.bgs[bgIdx])bgIdx=0;
-const saveOwned=()=>wx.setStorageSync('nulei_owned',owned);
+const saveOwned=()=>lsSet('nulei_owned',owned);
 const TIPS=['[ 拖动屏幕 ] 控制战机移动并自动射击','[ 击杀敌机 ] 拾取金币袋 · 小心掉血','[ 血条见底 ] 战机损毁 · 无敌帧内穿过弹幕','[ 中心小白点 ] 战机核心判定区','[ 双击屏幕 ] 暂停 / 继续','[ Boss 通关 ] 补给站金币购牌 · 升级主炮/导弹/维修'];
 const SET_BTN={x:W-92,y:HUD_TOP+4,w:80,h:40}; // 主页右上角设置入口（打开独立设置页）
 const RANK_BTN={x:20,y:HUD_TOP+4,w:80,h:40}; // 主页左上角排行榜入口（与设置入口镜像）
@@ -165,6 +168,8 @@ const SND_BTN={x:W/2-40,y:HUD_TOP+4,w:80,h:40}; // 主页顶部居中：全局�
 // 战斗中静音按钮放顶部左上角（得分左侧，与主页顶部声音开关呼应）：右上角是微信胶囊按钮地盘，放那儿会被盖住还可能误触退出菜单
 const mutePos=()=>({x:26,y:HUD_TOP+27}); // 与 drawHUD 中的小喇叭位置保持一致
 const REWARD_COINS=50; // 每次完整观看激励视频奖励金币
+// 新手引导（极简版）：仅首次游戏开局 8 秒显示操作提示，看满写档永不再出（30 秒内知道怎么玩）
+let tutDone=!!lsGet('nulei_tut',false);
 const VERSION='0.2.3'; // 与 version.json 的 latest 保持一致（设置页"关于"展示）
 // 升级项预留：数值效果已接入掉率(dropItem)与伤害(update)，商店 UI 上线后调 buyUpgrade 即可
 const UPGRADES={
@@ -312,9 +317,9 @@ function requestCoinDouble(){ // 本关金币收入翻倍（每关 1 次，仅�
     else toast(ok===null?'广告暂不可用，请稍后再试':'需完整观看才能翻倍');
   });
 }
-let ups=Object.assign({drop:0,power:0},wx.getStorageSync('nulei_up')||{});
-const saveCoins=()=>wx.setStorageSync('nulei_coins',coins);
-const saveUps=()=>wx.setStorageSync('nulei_up',ups);
+let ups=Object.assign({drop:0,power:0},lsGet('nulei_up',{}));
+const saveCoins=()=>lsSet('nulei_coins',coins);
+const saveUps=()=>lsSet('nulei_up',ups);
 const upVal=id=>ups[id]||0;
 function buyUpgrade(id){
   const u=UPGRADES[id];if(!u)return false;
@@ -371,8 +376,8 @@ Settings.setup({
 
 let drag=null;
 let dbgTap=null; // TEMP DEBUG: 触摸坐标校准准星，校准后删除
-const DBG_AID=true; // TEMP DEBUG: 调试辅助（网格坐标线+玩家定位十字），上线前置 false
-const DBG_GOD=true; // TEMP DEBUG: 调试无敌（挂机验证商店/Boss 流程用），上线前置 false
+const DBG_AID=false; // TEMP DEBUG: 调试辅助（网格坐标线+玩家定位十字），上线前置 false
+const DBG_GOD=false; // TEMP DEBUG: 调试无敌（挂机验证商店/Boss 流程用），上线前置 false
 // 双击暂停检测：两次"干净点按"（快速按下-抬起且未移动）间隔 <350ms 且位置相近
 let tStart=0,tStartX=0,tStartY=0,tMoved=false;
 let lastTapT=0,lastTapX=0,lastTapY=0;
@@ -477,7 +482,7 @@ function gameOver(){
   state='over';
   Sfx.bgmStop();Sfx.play('over');
   convertLeftoverCoins();
-  if(score>hi){hi=score;wx.setStorageSync('nulei_hi', hi);
+  if(score>hi){hi=score;lsSet('nulei_hi',hi);
     // 双榜同步：好友榜走微信托管 KV（子域读取），世界榜上报 nulei-server（失败静默）
     try{wx.setUserCloudStorage({KVDataList:[{key:'nulei_hi',value:String(hi)}],fail:()=>{}});}catch(e){}
     Rank.report(hi,runTime);
@@ -614,6 +619,7 @@ function update(dt){
   if(state==='clear'){clearT=Math.max(0,clearT-dt);if(clearT<=0)enterShop();return;} // 播完通关动画进补给站（土豆兄弟式选购节点）
   if(state!=='playing')return;
   elapsed+=dt;runTime+=dt;
+  if(!tutDone&&runTime>=8){tutDone=true;lsSet('nulei_tut',true);} // 提示看满 8 秒即完成
   if(warnT>0)warnT-=dt;
   const p=player;
   if(DBG_GOD)p.inv=1; // 调试无敌：免伤验证流程（伤害数值/金币入账不受影响）
@@ -958,6 +964,7 @@ function draw(){
   ctx.globalCompositeOperation='source-over';
   drawShip();
   drawHUD();
+  if(state==='playing')drawTutorial();
   if(state==='shop')drawShop();
   if(state==='playing'&&warnT>0){ // 首领/精英出场警告横幅
     const blink=Math.floor(Date.now()/140)%2===0;
@@ -1100,6 +1107,17 @@ function drawGear(x,y,r){
   for(let i=0;i<8;i++){const a=i*Math.PI/4;
     ctx.fillRect(x+Math.cos(a)*r*0.78-2,y+Math.sin(a)*r*0.78-2,4,4);}
   ctx.beginPath();ctx.arc(x,y,r*0.2,0,7);ctx.fill();
+  ctx.restore();
+}
+// 首次游戏开局提示：闪烁两行文案覆盖在玩法区下方，不挡机体初始位置（H-90）
+function drawTutorial(){
+  if(tutDone||stage>1||runTime>=8)return;
+  const a=0.55+0.45*Math.sin(runTime*5);
+  ctx.save();ctx.globalAlpha=a;ctx.textAlign='center';
+  ctx.fillStyle='#eaffff';ctx.font='bold 17px monospace';
+  ctx.fillText('拖动屏幕 移动机体 · 自动开火',W/2,H*0.62);
+  ctx.fillStyle='#ffe600';ctx.font='13px monospace';
+  ctx.fillText('击毁敌机拾金币 · 小心红色弹幕',W/2,H*0.62+26);
   ctx.restore();
 }
 // HUD：纯发光文字，不再画面板底框（去框减少视野遮挡与"网页卡片"感）
