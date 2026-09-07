@@ -224,7 +224,7 @@ function drawPlay(ctx, d, C){
   ctx.fillStyle = 'rgba(230,240,255,0.8)'; ctx.font = '12px monospace';
   y = wrap(ctx, '每关 55 秒后首领登场（第 1 关 35 秒），第 2 关起中途还有精英出击；击破首领即通关，可继续下一关或返回主页。', x, y, w, 20);
   ctx.fillStyle = 'rgba(230,240,255,0.8)'; ctx.font = '12px monospace';
-  y = wrap(ctx, '阵亡可看广告复活（每局 2 次）；过关与阵亡都按得分折算金币，结算页可看广告翻倍。', x, y+6, w, 20);
+  y = wrap(ctx, d.adOff ? '阵亡即本局结束；过关与阵亡都按得分折算金币存入存款。' : '阵亡可看广告复活（每局 2 次）；过关与阵亡都按得分折算金币，结算页可看广告翻倍。', x, y+6, w, 20);
   return y;
 }
 
@@ -292,11 +292,13 @@ function drawShop(ctx, d, C){
   ctx.save(); ctx.shadowColor = COL.gold; ctx.shadowBlur = 10;
   txt(ctx, '◈ ' + (d.coins || 0), x+14, y+48, COL.gold, 'bold 24px monospace');
   ctx.restore();
-  const ad = { x:x+w-122, y:y+14, w:108, h:34 };
-  UI.drawNeonPanel(ctx, ad.x, ad.y, ad.w, ad.h, '', COL.gold);
-  txt(ctx, '看广告 +' + (d.reward || 50), ad.x+ad.w/2, ad.y+22, '#fff3b0', 'bold 13px monospace', 'center');
-  hit(ad.x, ad.y, ad.w, ad.h, ()=>call('ad'), true);
-  y += 76;
+  if (!d.adOff) { // 首版 ADS_OFF：广告入口隐藏，余额下方直接排永久强化
+    const ad = { x:x+w-122, y:y+14, w:108, h:34 };
+    UI.drawNeonPanel(ctx, ad.x, ad.y, ad.w, ad.h, '', COL.gold);
+    txt(ctx, '看广告 +' + (d.reward || 50), ad.x+ad.w/2, ad.y+22, '#fff3b0', 'bold 13px monospace', 'center');
+    hit(ad.x, ad.y, ad.w, ad.h, ()=>call('ad'), true);
+  }
+  y += d.adOff ? 18 : 76;
   txt(ctx, '永久强化', x, y+10, COL.gold, 'bold 13px monospace');
   y += 26;
   for (const id of ['drop', 'power']) {
@@ -319,7 +321,7 @@ function drawShop(ctx, d, C){
     y += 96;
   }
   ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '12px monospace';
-  return wrap(ctx, '强化永久生效并保存在本机；金币通过看广告与对局结算获得。', x, y+10, w, 18);
+  return wrap(ctx, d.adOff ? '强化永久生效并保存在本机；金币通过对局结算获得。' : '强化永久生效并保存在本机；金币通过看广告与对局结算获得。', x, y+10, w, 18);
 }
 
 // 声音：音效 / 音乐独立开关
@@ -373,7 +375,8 @@ function drawAbout(ctx, d, C){
   }
   ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '12px monospace';
   y = wrap(ctx, '存档保存在本机（微信本地存储），换设备不互通；破纪录时排行榜得分自动上报。', x, y+14, w, 18);
-  return wrap(ctx, '本作含激励视频广告（玩家主动触发）：看广告可复活、翻倍金币、领取金币，广告不影响战斗数值。', x, y+8, w, 18);
+  if (!d.adOff) return wrap(ctx, '本作含激励视频广告（玩家主动触发）：看广告可复活、翻倍金币、领取金币，广告不影响战斗数值。', x, y+8, w, 18);
+  return y;
 }
 function count(arr){
   if (!arr || !arr.length) return 0;

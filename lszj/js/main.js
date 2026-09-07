@@ -93,7 +93,7 @@ const playBottom=()=>H-44-bottomInset(); // 玩家可移动的最低位置（机
 const MAX_REVIVE=2;
 let reviveUsed=0,reviving=false,msg='',msgT=0;
 const REVIVE_BTN={x:W/2-150,y:H/2+52,w:145,h:48};
-const restartRect=()=>reviveUsed<MAX_REVIVE?{x:W/2+5,y:H/2+52,w:145,h:48}:{x:W/2-72,y:H/2+52,w:144,h:48};
+const restartRect=()=>reviveUsed<MAX_REVIVE&&!ADS_OFF?{x:W/2+5,y:H/2+52,w:145,h:48}:{x:W/2-72,y:H/2+52,w:144,h:48};
 // 结算金币（v0.2.0）：金币为局内货币（商店购牌），死亡/返回主页时剩余按 1/5 折算为局外存款，可看广告翻倍一次
 let settleDoubled=false;
 const OVER_COIN_BTN={x:W/2-140,y:H/2+112,w:280,h:38};
@@ -103,7 +103,7 @@ function convertLeftoverCoins(){
   settleDoubled=false;
 }
 function requestSettleDouble(){
-  if(reviving||settleDoubled||settleConverted<=0)return;
+  if(ADS_OFF||reviving||settleDoubled||settleConverted<=0)return;
   reviving=true;
   Ads.playRewarded(ok=>{
     reviving=false;
@@ -121,7 +121,7 @@ const PAUSE_BTNS=[
 const inRect=(t,b)=>t.x>=b.x&&t.x<=b.x+b.w&&t.y>=b.y&&t.y<=b.y+b.h;
 function toast(s){msg=s;msgT=2.2;}
 function requestRevive(){
-  if(reviving||reviveUsed>=MAX_REVIVE)return;
+  if(ADS_OFF||reviving||reviveUsed>=MAX_REVIVE)return;
   reviving=true;
   Ads.playRewarded(ok=>{
     reviving=false;
@@ -168,6 +168,8 @@ const SND_BTN={x:W/2-40,y:HUD_TOP+4,w:80,h:40}; // 主页顶部居中：全局�
 // 战斗中静音按钮放顶部左上角（得分左侧，与主页顶部声音开关呼应）：右上角是微信胶囊按钮地盘，放那儿会被盖住还可能误触退出菜单
 const mutePos=()=>({x:26,y:HUD_TOP+27}); // 与 drawHUD 中的小喇叭位置保持一致
 const REWARD_COINS=50; // 每次完整观看激励视频奖励金币
+// 上线首版隐藏全部广告入口（流量主未开通，模拟广告不宜提审）；开通后置 false 恢复全部入口
+const ADS_OFF=true;
 // 新手引导（极简版）：仅首次游戏开局 8 秒显示操作提示，看满写档永不再出（30 秒内知道怎么玩）
 let tutDone=!!lsGet('nulei_tut',false);
 const VERSION='0.2.3'; // 与 version.json 的 latest 保持一致（设置页"关于"展示）
@@ -288,14 +290,14 @@ function buyCard(i){ // 商店购牌：扣金币→应用→出新三张（多�
   runCoins-=p;applyBuff(b);offer=roll3();
 }
 function enterShop(){ // Boss 通关 clear 动画结束后进入：每关一次选购节点
-  state='shop';offer=roll3();shopRefreshN=0;adRefreshUsed=false;coinDoubled=false;
+  state='shop';offer=roll3();shopRefreshN=0;adRefreshUsed=ADS_OFF;coinDoubled=false;
   // 土豆兄弟式波末自动回收：场上残留金币袋直接入账（避免冻结半空/滚入下一关收入）
   for(const it of items)if(it.kind==='coin')addCoin(it.coin);
   items=[];Sfx.play('coin');
 }
 function requestShopRefresh(){ // 刷新两用：优先看广告免费刷（每关 1 次），已用则金币刷（费用递增）
   if(adRefreshBusy||state!=='shop')return;
-  if(!adRefreshUsed){
+  if(!adRefreshUsed&&!ADS_OFF){
     adRefreshBusy=true;
     Ads.playRewarded(ok=>{
       adRefreshBusy=false;
@@ -309,7 +311,7 @@ function requestShopRefresh(){ // 刷新两用：优先看广告免费刷（每�
   runCoins-=c;shopRefreshN++;offer=roll3();Sfx.play('click');
 }
 function requestCoinDouble(){ // 本关金币收入翻倍（每关 1 次，仅商店内）
-  if(coinDoubled||adRefreshBusy||state!=='shop'||runCoinIncome<=0)return;
+  if(ADS_OFF||coinDoubled||adRefreshBusy||state!=='shop'||runCoinIncome<=0)return;
   adRefreshBusy=true;
   Ads.playRewarded(ok=>{
     adRefreshBusy=false;
@@ -331,7 +333,7 @@ function buyUpgrade(id){
   return true;
 }
 function requestCoinAd(){
-  if(reviving)return;
+  if(ADS_OFF||reviving)return;
   reviving=true;
   Ads.playRewarded(ok=>{
     reviving=false;
@@ -367,7 +369,7 @@ Settings.setup({
   onClose:()=>{state='title';},
   data:()=>({coins,hi,shipIdx,bgIdx,owned,ups,ships:SHIPS,bgs:BGS,
     shipPrice:SHIP_PRICE,bgPrice:BG_PRICE,upsDef:UPGRADES,reward:REWARD_COINS,tips:TIPS,
-    version:VERSION,sfxOn:Sfx.sfxOn,bgmOn:Sfx.bgmOn,drawShip:drawShipShape}),
+    version:VERSION,adOff:ADS_OFF,sfxOn:Sfx.sfxOn,bgmOn:Sfx.bgmOn,drawShip:drawShipShape}),
   act:{pickShip,pickBg,ad:requestCoinAd,buy:tryBuyUpgrade,
     sfx:()=>{Sfx.toggleSfx();if(Sfx.sfxOn)Sfx.play('click');}, // 开时响一声确认，关时无声
     bgm:()=>{Sfx.toggleBgm();Sfx.play('click');},
@@ -397,7 +399,7 @@ wx.onTouchStart(e => {
   }
   if (state === 'over') {
     if (reviving) return;
-    if (reviveUsed<MAX_REVIVE && inRect(t,REVIVE_BTN)) { requestRevive(); return; }
+    if (!ADS_OFF && reviveUsed<MAX_REVIVE && inRect(t,REVIVE_BTN)) { requestRevive(); return; }
     if (inRect(t,OVER_COIN_BTN)) { requestSettleDouble(); return; }
     if (inRect(t,restartRect())) startGame();
     return;
@@ -473,7 +475,7 @@ function startGame(){
   reviveUsed=0;reviving=false;msgT=0;settleConverted=0;settleDoubled=false;
   Object.assign(player,{x:W/2,y:H-90,hp:100,maxHp:100,inv:2,weapon:'std',wlevel:2,mis:'none',mlevel:0,fireT:0,misT:0,
     buffs:{},shield:0,shieldT:0,r:5});
-  runCoins=0;offer=[];runPicks=0;runTopBuff={name:'',n:0};adRefreshUsed=false;adRefreshBusy=false;shopRefreshN=0;runCoinsAtStage=0;runCoinIncome=0;coinDoubled=false;
+  runCoins=0;offer=[];runPicks=0;runTopBuff={name:'',n:0};adRefreshUsed=ADS_OFF;adRefreshBusy=false;shopRefreshN=0;runCoinsAtStage=0;runCoinIncome=0;coinDoubled=false;
   Sfx.play('click');Sfx.bgmStart(); // 进入战斗：BGM 起（CDN 未就绪/失败则静默，无碍游玩）
 }
 function nextStage(){stage++;elapsed=0;spawnT=1;boss=null;ebullets=[];miniSpawned=false;warnT=0;hitStop=0;state='playing';player.inv=Math.max(player.inv,1);runCoinsAtStage=runCoins;runCoinIncome=0;Sfx.bgmStart();} // 出战给 1s 无敌缓冲
@@ -1001,7 +1003,7 @@ function draw(){
       ctx.fillText('剩余金币 '+runCoins+' · 存款 +'+(settleDoubled?settleConverted*2:settleConverted)+(settleDoubled?' · 已翻倍':''),W/2,H/2+42);
     }
     // 复活 / 重新开始按钮
-    if(reviveUsed<MAX_REVIVE){
+    if(!ADS_OFF&&reviveUsed<MAX_REVIVE){
       UI.drawNeonPanel(ctx,REVIVE_BTN.x,REVIVE_BTN.y,REVIVE_BTN.w,REVIVE_BTN.h,'复活机会 '+(MAX_REVIVE-reviveUsed),'#00f3ff');
       ctx.fillStyle=reviving?'#666':'#00f3ff';ctx.font='bold 15px monospace';
       ctx.fillText(reviving?'加载中...':'▶ 看广告复活',REVIVE_BTN.x+REVIVE_BTN.w/2,REVIVE_BTN.y+34);
@@ -1010,7 +1012,7 @@ function draw(){
     UI.drawNeonPanel(ctx,rb.x,rb.y,rb.w,rb.h,'再来一局','#ff0055');
     ctx.fillStyle='#fff';ctx.font='bold 15px monospace';
     ctx.fillText('重新开始',rb.x+rb.w/2,rb.y+34);
-    if(settleConverted>0&&!settleDoubled){
+    if(settleConverted>0&&!settleDoubled&&!ADS_OFF){
       UI.drawNeonPanel(ctx,OVER_COIN_BTN.x,OVER_COIN_BTN.y,OVER_COIN_BTN.w,OVER_COIN_BTN.h,'','#ffe600');
       ctx.fillStyle=reviving?'#666':'#ffe600';ctx.font='bold 15px monospace';
       ctx.fillText(reviving?'加载中...':'▶ 看广告 存款翻倍',OVER_COIN_BTN.x+OVER_COIN_BTN.w/2,OVER_COIN_BTN.y+25);
@@ -1309,11 +1311,13 @@ function drawShop(){
   ctx.beginPath();ctx.moveTo(c2.x+c2.w-sn(16),ay-sn(5));ctx.lineTo(c2.x+c2.w-sn(9),ay);ctx.lineTo(c2.x+c2.w-sn(16),ay+sn(5));ctx.closePath();ctx.fill();
   ctx.fillStyle='rgba(125,255,140,0.5)';
   ctx.beginPath();ctx.moveTo(c2.x+c2.w-sn(24),ay-sn(5));ctx.lineTo(c2.x+c2.w-sn(17),ay);ctx.lineTo(c2.x+c2.w-sn(24),ay+sn(5));ctx.closePath();ctx.fill();
-  // 本关金币翻倍（每关 1 次）
-  const c3=SHOP_ADCOIN,on=!coinDoubled&&runCoinIncome>0;
-  UI.drawChamferPanel(ctx,c3.x,c3.y,c3.w,c3.h,{c:on?'#ffd23c':'#4a5a70',fill:on?'rgba(42,32,4,0.94)':'rgba(12,16,24,0.8)',cut:sn(8),halo:on?sn(6):0,haloA:0.16,lw:1.5,ticks:false});
-  ctx.fillStyle=on?'#ffe600':'#5a6a80';ctx.font=SFS(13,true);
-  ctx.fillText(coinDoubled?'本关金币已翻倍':(on?'▶ 看广告 本关金币翻倍 +'+runCoinIncome:'本关暂无金币收入'),c3.x+c3.w/2,c3.y+c3.h/2);
+  // 本关金币翻倍（每关 1 次；ADS_OFF 时整块入口不画，留白待恢复）
+  const c3=SHOP_ADCOIN,on=!ADS_OFF&&!coinDoubled&&runCoinIncome>0;
+  if(!ADS_OFF){
+    UI.drawNeonPanel(ctx,c3.x,c3.y,c3.w,c3.h,{c:on?'#ffd23c':'#4a5a70',fill:on?'rgba(42,32,4,0.94)':'rgba(12,16,24,0.8)',cut:sn(8),halo:on?sn(6):0,haloA:0.16,lw:1.5,ticks:false});
+    ctx.fillStyle=on?'#ffe600':'#5a6a80';ctx.font=SFS(13,true);
+    ctx.fillText(coinDoubled?'本关金币已翻倍':(on?'▶ 看广告 本关金币翻倍 +'+runCoinIncome:'本关暂无金币收入'),c3.x+c3.w/2,c3.y+c3.h/2);
+  }
   // 本局构筑摘要：把散在各处的买牌收成一行，给下一关一个可读的"我现在的流派"
   const c4=SHOP_BUILD;
   UI.drawChamferPanel(ctx,c4.x,c4.y,c4.w,c4.h,{c:'rgba(0,243,255,0.35)',fill:'rgba(8,12,22,0.9)',cut:sn(7),lw:1,ticks:false});
