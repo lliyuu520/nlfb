@@ -41,6 +41,7 @@ type Config struct {
 	TokenSecret     string `json:"tokenSecret"`     // HMAC 签名密钥，首次启动自动生成
 	MaxScore        int64  `json:"maxScore"`        // 单局分数硬上限
 	MaxScoreRate    int64  `json:"maxScoreRate"`    // 每秒理论最大得分（防作弊）
+	MaxRunSec       int64  `json:"maxRunSec"`       // 单局时长上限（秒）：时长由客户端上报，超上限按异常拒绝
 	MaxDailyReports int    `json:"maxDailyReports"` // 每玩家每日上报次数上限
 	MaxNicknameLen  int    `json:"maxNicknameLen"`  // 昵称最大字符数（rune）
 	TokenDays       int    `json:"tokenDays"`       // token 有效天数
@@ -53,6 +54,7 @@ func defaultConfig() Config {
 		BasePath:        "/nulei/api",
 		MaxScore:        9999999,
 		MaxScoreRate:    800,
+		MaxRunSec:       3600,
 		MaxDailyReports: 50,
 		MaxNicknameLen:  12,
 		TokenDays:       30,
@@ -113,6 +115,8 @@ type Player struct {
 	Nickname  string `json:"nickname,omitempty"`
 	BestScore int64  `json:"bestScore"`
 	UpdatedAt int64  `json:"updatedAt"`
+	DurTotal  int64  `json:"durTotal,omitempty"` // 累计上报时长（秒）：做"总时长 ≤ 墙钟流逝"预算校验
+	FirstAt   int64  `json:"firstAt,omitempty"`  // 首次上报时间，预算起点
 }
 
 type Store struct {
@@ -160,7 +164,14 @@ func (s *Store) peek(openid string) Player {
 	return Player{OpenID: openid}
 }
 
-func (s *Store) submit(openid string, score int64, now int64) (best int64, updated bool, rank int64, err error) {
+// durBudgetSlack：累计时长预算的宽限（秒）。单局"分数≤速率×时长"里的时长是客户端自报的，
+// 可伪造大时长绕过校验；再加一层"累计上报时长 ≤ 首次上报以来的墙钟时间+宽限"封顶。
+// 正常玩家玩多久报多久永远够用，宽限只覆盖重试/时钟误差。
+const durBudgetSlack int64 = 3600
+
+var errDurBudget = errors.New("上报时长超出合理范围")
+
+func (s *Store) submit(openid string, score int64, dur int64, now int64) (best int64, updated bool, rank int64, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p, ok := s.byID[openid]
@@ -168,13 +179,20 @@ func (s *Store) submit(openid string, score int64, now int64) (best int64, updat
 		p = &Player{OpenID: openid}
 		s.byID[openid] = p
 	}
+	if p.FirstAt == 0 {
+		p.FirstAt = now
+	}
+	if p.DurTotal+dur > now-p.FirstAt+durBudgetSlack {
+		return 0, false, 0, errDurBudget
+	}
+	p.DurTotal += dur
 	if score > p.BestScore {
 		p.BestScore = score
 		p.UpdatedAt = now
 		updated = true
-		if err = s.saveLocked(); err != nil {
-			return 0, false, 0, err
-		}
+	}
+	if err = s.saveLocked(); err != nil { // 时长预算每次上报都要落盘，否则重启后预算清零可被刷
+		return 0, false, 0, err
 	}
 	best = p.BestScore
 	rank, err = s.rankOfLocked(openid)
@@ -482,7 +500,7 @@ func (a *app) handleScore(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errOf("分数异常"))
 		return
 	}
-	if req.Duration < 1 || req.Duration > 86400 {
+	if req.Duration < 1 || req.Duration > a.cfg.MaxRunSec {
 		writeJSON(w, http.StatusBadRequest, errOf("时长异常"))
 		return
 	}
@@ -494,8 +512,12 @@ func (a *app) handleScore(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusTooManyRequests, errOf("今日上报次数已达上限"))
 		return
 	}
-	best, updated, rank, err := a.store.submit(openid, req.Score, time.Now().Unix())
+	best, updated, rank, err := a.store.submit(openid, req.Score, req.Duration, time.Now().Unix())
 	if err != nil {
+		if errors.Is(err, errDurBudget) {
+			writeJSON(w, http.StatusBadRequest, errOf("上报时长异常"))
+			return
+		}
 		log.Printf("score 存储失败: %v", err)
 		writeJSON(w, http.StatusInternalServerError, errOf("存储失败"))
 		return
