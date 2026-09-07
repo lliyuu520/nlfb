@@ -11,11 +11,11 @@ const FAKE_AD_SEC = 5;    // 模拟激励视频时长（秒），真机为 15~30
 const REWARDED_AD_UNIT = 'adunit-placeholder-rewarded'; // 激励视频广告位（复活）
 
 let rv = null;
-let gameH = 800, gameW = 480;
+let gameH = 800, gameW = 480, topSafe = 0; // topSafe：顶部安全下缘（微信胶囊之下），模拟广告跳过按钮用
 let fakeAd = null;      // 假激励视频会话 {cb, end}；非 null 即播放中
 
 function setup(o) {
-  gameH = o.gameH; gameW = o.gameW || 480;
+  gameH = o.gameH; gameW = o.gameW || 480; topSafe = o.topSafe || 0;
   if (USE_FAKE) return;
   try {
     rv = wx.createRewardedVideoAd({ adUnitId: REWARDED_AD_UNIT });
@@ -46,7 +46,7 @@ function playRewarded(cb) {
 }
 
 // ---- 假激励视频绘制与交互（USE_FAKE 专用；ctx 由 main.draw 在游戏坐标变换下传入） ----
-const skipRect = () => ({ x: gameW - 100, y: 16, w: 86, h: 34 });
+const skipRect = () => ({ x: gameW - 100, y: Math.max(16, topSafe + 10), w: 86, h: 34 }); // y 下移让开右上角微信胶囊
 function finishFake(ok) { const cb = fakeAd.cb; fakeAd = null; cb(ok); }
 
 // 展示期间吞掉所有触点：命中跳过按中途放弃结束，其余点击不透传给游戏。返回是否已消费
@@ -73,10 +73,10 @@ function draw(ctx) {
   ctx.fillText('广告播放中', gameW / 2, py + 74);
   ctx.fillStyle = '#00f3ff'; ctx.font = 'bold 44px monospace';
   ctx.fillText(String(remain), gameW / 2, py + 128);
-  ctx.fillStyle = '#8fa8c8'; ctx.font = '12px monospace';
+  ctx.fillStyle = '#8fa8c8'; ctx.font = '13px monospace';
   ctx.fillText('观看完毕自动发放奖励', gameW / 2, py + 164);
   UI.drawNeonPanel(ctx, s.x, s.y, s.w, s.h, '', '#ff0055');
-  ctx.fillStyle = '#ff7a95'; ctx.font = 'bold 13px monospace';
+  ctx.fillStyle = '#ff7a95'; ctx.font = 'bold 14px monospace';
   ctx.fillText('跳过 ✕', s.x + s.w / 2, s.y + s.h / 2 + 1);
   ctx.restore();
 }

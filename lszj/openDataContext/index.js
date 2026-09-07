@@ -1,15 +1,19 @@
 // 开放数据域（子域）入口：好友榜渲染。
 // 沙箱限制：无网络、无本地存储、无触摸事件；只响应主域 postMessage（单向通信），
 // 画面输出到 sharedCanvas，由主域 drawImage 合成。
-// 注意：SUB_W/SUB_H/ROWS 必须与主域 js/rank.js 的常量保持一致（760×616 = 380×308 的 2 倍）。
+// 注意：真机上 sharedCanvas 尺寸可能不等于设置的 760×616（系统按窗口/物理尺寸分配），
+// 因此布局全部按 cv 实际宽高动态计算，主域按实际宽高比 contain 合成，两侧都不依赖固定值。
 const cv = wx.getSharedCanvas();
 const ctx = cv.getContext('2d');
-const SUB_W = 760, SUB_H = 616;
-const ROWS = 7, ROW_H = 88;
+const SUB_W = 760, SUB_H = 616; // 期望尺寸（开发者工具下生效）；真机以 cv 实际值为准
+const ROWS = 7;
 const KV_KEY = 'nulei_hi';
 
-cv.width = SUB_W;
-cv.height = SUB_H;
+// 2× 超采样请求：好友榜文字是主域 drawImage 缩放合成的，子域画布分辨率越高合成越锐利。
+// 真机 sharedCanvas 尺寸由系统分配、可能忽略赋值（下方 contentRect 的 k 按实际宽高兜底），
+// 赋值生效的环境（开发者工具等）按 2× 起画布，字号随 k 等比放大，视觉尺寸不变、清晰度翻倍
+cv.width = SUB_W * 2;
+cv.height = SUB_H * 2;
 
 let list = [];
 let page = 0;
@@ -47,35 +51,49 @@ function load() {
 
 const rankColor = r => r === 1 ? '#ffe600' : r === 2 ? '#c8d3ff' : r === 3 ? '#ffaa66' : '#8892a8';
 
+// 内容区：真机画布尺寸/比例不可控，统一把内容绘制在画布中央的 SUB_W:SUB_H 比例矩形内，
+// 主域按同一比例九参 drawImage 裁剪合成 —— 任何画布尺寸下字号与布局恒定不变形
+function contentRect() {
+  const W = cv.width, H = cv.height, ratio = SUB_W / SUB_H;
+  let w = W, h = W / ratio;
+  if (h > H) { h = H; w = H * ratio; }
+  return { x: (W - w) / 2, y: (H - h) / 2, w: w, h: h, k: w / SUB_W };
+}
+
 function drawMsg(lines) {
+  const R = contentRect(), k = R.k;
+  ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.fillStyle = 'rgba(2,4,10,0.35)';
-  ctx.fillRect(0, 0, SUB_W, SUB_H);
+  ctx.fillRect(R.x, R.y, R.w, R.h);
   ctx.textAlign = 'center';
   lines.forEach((s, i) => {
     ctx.fillStyle = i === 0 ? '#8892a8' : 'rgba(156,163,175,0.6)';
-    ctx.font = (i === 0 ? 'bold 30px' : '26px') + ' monospace';
-    ctx.fillText(s, SUB_W / 2, SUB_H / 2 - 20 + i * 48);
+    ctx.font = 'bold ' + Math.round((i === 0 ? 30 : 26) * k) + 'px monospace';
+    ctx.fillText(s, R.x + R.w / 2, R.y + R.h / 2 - 20 * k + i * 48 * k);
   });
 }
 
 function draw() {
+  const R = contentRect(), k = R.k;
+  const rowH = R.h / ROWS;
+  ctx.clearRect(0, 0, cv.width, cv.height);
   if (!list.length) { drawMsg(['还没有好友成绩', '分享给好友，比比谁飞得更远']); return; }
   ctx.fillStyle = 'rgba(2,4,10,0.35)';
-  ctx.fillRect(0, 0, SUB_W, SUB_H);
+  ctx.fillRect(R.x, R.y, R.w, R.h);
   const rows = list.slice(page * ROWS, page * ROWS + ROWS);
   rows.forEach((r, i) => {
-    const y = i * ROW_H;
+    const y = R.y + i * rowH;
     ctx.fillStyle = rankColor(page * ROWS + i + 1);
-    ctx.font = 'bold 30px monospace'; ctx.textAlign = 'left';
-    ctx.fillText('#' + (page * ROWS + i + 1), 16, y + 56);
-    ctx.fillStyle = '#e6eeff'; ctx.font = '28px monospace';
-    ctx.fillText(r.name, 112, y + 56);
+    ctx.font = 'bold ' + Math.round(30 * k) + 'px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('#' + (page * ROWS + i + 1), R.x + 16 * k, y + rowH / 2 + 10 * k);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(r.name, R.x + 112 * k, y + rowH / 2 + 10 * k);
     ctx.fillStyle = '#7dff8c'; ctx.textAlign = 'right';
-    ctx.fillText(String(r.score), SUB_W - 20, y + 56);
+    ctx.fillText(String(r.score), R.x + R.w - 20 * k, y + rowH / 2 + 10 * k);
     ctx.textAlign = 'left';
     if (i < rows.length - 1) {
-      ctx.strokeStyle = 'rgba(0,243,255,0.10)'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(12, y + ROW_H - 1); ctx.lineTo(SUB_W - 12, y + ROW_H - 1); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,243,255,0.10)'; ctx.lineWidth = Math.max(1, k);
+      ctx.beginPath(); ctx.moveTo(R.x + 12 * k, y + rowH - 1); ctx.lineTo(R.x + R.w - 12 * k, y + rowH - 1); ctx.stroke();
     }
   });
 }

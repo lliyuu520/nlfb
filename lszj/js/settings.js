@@ -29,7 +29,6 @@ const ITEMS = [
   { img:'掉落物-02',   c:'#4da6ff', l:'B', n:'穿透激光', d:'贯穿一整列敌人' },
   { img:'Buff道具-06', c:'#ffd23c', l:'Y', n:'追踪导弹', d:'副武器自动索敌' },
   { img:'掉落物-03',   c:'#c77dff', l:'P', n:'激光导弹', d:'副武器贯穿射线' },
-  { img:'Buff道具-04', c:'#ff8c42', l:'M', n:'高能炸弹', d:'补充一颗全屏炸弹' },
   { img:'掉落物-06',   c:'#7dff8c', l:'S', n:'得分徽章', d:'立刻加 500 分' },
 ];
 const UPGRADE_META = {
@@ -217,7 +216,7 @@ function drawPlay(ctx, d, C){
       txt(ctx, it.l, x+16, y-13, '#0a0a12', 'bold 14px monospace', 'center');
     }
     txt(ctx, it.n, x+40, y-16, COL.txt, 'bold 12px monospace');
-    txt(ctx, it.d, x+40, y-1, COL.dim, '11px monospace');
+    txt(ctx, it.d, x+40, y-1, COL.dim, '12px monospace');
   }
   y += 26;
   txt(ctx, '关卡规则', x, y, COL.gold, 'bold 13px monospace');
@@ -242,7 +241,7 @@ function drawShipTab(ctx, d, C){
     txt(ctx, sk.name, pv.x+98, pv.y+40, '#eaffff', 'bold 16px monospace');
     txt(ctx, '当前使用', pv.x+98, pv.y+62, COL.cyan, '12px monospace');
   }
-  txt(ctx, '涂装仅改变外观，不影响任何数值', pv.x+98, pv.y+82, COL.dim, '11px monospace');
+  txt(ctx, '涂装仅改变外观，不影响任何数值', pv.x+98, pv.y+82, COL.dim, '12px monospace');
   let y = pv.y + pv.h + 16;
   ships.forEach((s, i) => {
     const own = !!(d.owned && d.owned.ships && d.owned.ships[i]);
@@ -265,7 +264,7 @@ function drawThemeTab(ctx, d, C){
   const bgs = d.bgs || [], x = C.x + PAD, w = C.w - PAD*2;
   let y = C.y + 22;
   txt(ctx, '背景主题', x, y, COL.green, 'bold 13px monospace');
-  txt(ctx, '切换后主页与战斗背景同步生效', x+72, y, COL.dim, '11px monospace');
+  txt(ctx, '切换后主页与战斗背景同步生效', x+72, y, COL.dim, '12px monospace');
   y += 18;
   bgs.forEach((th, i) => {
     const own = !!(d.owned && d.owned.bgs && d.owned.bgs[i]);
@@ -295,7 +294,7 @@ function drawShop(ctx, d, C){
   ctx.restore();
   const ad = { x:x+w-122, y:y+14, w:108, h:34 };
   UI.drawNeonPanel(ctx, ad.x, ad.y, ad.w, ad.h, '', COL.gold);
-  txt(ctx, '看广告 +' + (d.reward || 50), ad.x+ad.w/2, ad.y+22, '#fff3b0', 'bold 12px monospace', 'center');
+  txt(ctx, '看广告 +' + (d.reward || 50), ad.x+ad.w/2, ad.y+22, '#fff3b0', 'bold 13px monospace', 'center');
   hit(ad.x, ad.y, ad.w, ad.h, ()=>call('ad'), true);
   y += 76;
   txt(ctx, '永久强化', x, y+10, COL.gold, 'bold 13px monospace');
@@ -307,19 +306,19 @@ function drawShop(ctx, d, C){
     const meta = UPGRADE_META[id] || { n:id, d:'' };
     UI.drawNeonPanel(ctx, x, y, w, 84, '', maxed ? COL.green : COL.gold);
     txt(ctx, meta.n, x+14, y+26, maxed ? COL.green : COL.txt, 'bold 15px monospace');
-    txt(ctx, meta.d + ' · 每级 +' + Math.round((def.val(1) - def.val(0))*100) + '%', x+14, y+46, COL.dim, '11px monospace');
+    txt(ctx, meta.d + ' · 每级 +' + Math.round((def.val(1) - def.val(0))*100) + '%', x+14, y+46, COL.dim, '12px monospace');
     for (let i = 0; i < def.max; i++) { // 等级点阵
       ctx.fillStyle = i < lv ? (maxed ? COL.green : COL.gold) : 'rgba(255,255,255,0.15)';
       ctx.fillRect(x+14+i*16, y+56, 12, 8);
     }
-    txt(ctx, maxed ? '已满级' : 'Lv' + lv + ' → ' + (lv+1), x+14, y+76, maxed ? COL.green : COL.dim, '11px monospace');
+    txt(ctx, maxed ? '已满级' : 'Lv' + lv + ' → ' + (lv+1), x+14, y+76, maxed ? COL.green : COL.dim, '12px monospace');
     const bb = { x:x+w-104, y:y+44, w:90, h:32 };
     UI.drawNeonPanel(ctx, bb.x, bb.y, bb.w, bb.h, '', maxed ? COL.green : COL.gold);
     txt(ctx, maxed ? '满级' : '◈ ' + cost, bb.x+bb.w/2, bb.y+21, maxed ? '#0b1a0f' : '#0f1206', 'bold 13px monospace', 'center');
     hit(bb.x, bb.y, bb.w, bb.h, ()=>call('buy', id), true);
     y += 96;
   }
-  ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '11px monospace';
+  ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '12px monospace';
   return wrap(ctx, '强化永久生效并保存在本机；金币通过看广告与对局结算获得。', x, y+10, w, 18);
 }
 
@@ -331,14 +330,14 @@ function drawSound(ctx, d, C){
   y += 20;
   y = drawToggle(ctx, { x:x, y:y, w:w, h:64 }, '音效', '按钮、射击与爆炸反馈', !!d.sfxOn, COL.cyan, ()=>call('sfx'));
   y = drawToggle(ctx, { x:x, y:y, w:w, h:64 }, '背景音乐', '战斗 BGM（CDN 加载）', !!d.bgmOn, COL.green, ()=>call('bgm'));
-  ctx.fillStyle = COL.dim; ctx.font = '11px monospace';
+  ctx.fillStyle = COL.dim; ctx.font = '12px monospace';
   return wrap(ctx, '两项都关 = 全局静音。主页顶部的喇叭按钮可一键切换，设置立即生效并记住。', x, y+6, w, 18);
 }
 
 function drawToggle(ctx, b, title, desc, on, color, fn){
   UI.drawNeonPanel(ctx, b.x, b.y, b.w, b.h, '', on ? color : COL.idle);
   txt(ctx, title, b.x+14, b.y+27, on ? '#eaffff' : COL.dim, 'bold 14px monospace');
-  txt(ctx, desc, b.x+14, b.y+48, COL.dim, '11px monospace');
+  txt(ctx, desc, b.x+14, b.y+48, COL.dim, '12px monospace');
   const sw = { x:b.x+b.w-66, y:b.y+18, w:52, h:28 };
   ctx.fillStyle = on ? 'rgba(0,243,255,0.18)' : 'rgba(255,255,255,0.08)';
   UI.roundedRect(ctx, sw.x, sw.y, sw.w, sw.h, 14); ctx.fill();
@@ -358,7 +357,7 @@ function drawAbout(ctx, d, C){
   ctx.save(); ctx.shadowColor = COL.cyan; ctx.shadowBlur = 18;
   txt(ctx, '怒雷风暴', C.x+C.w/2, y, '#9feaff', 'bold 26px monospace', 'center');
   ctx.restore();
-  txt(ctx, '版本 v' + (d.version || '0.0.0'), C.x+C.w/2, y+22, COL.dim, '11px monospace', 'center');
+  txt(ctx, '版本 v' + (d.version || '0.0.0'), C.x+C.w/2, y+22, COL.dim, '12px monospace', 'center');
   y += 54;
   const rows = [
     ['最高分', String(d.hi || 0)],
@@ -372,7 +371,7 @@ function drawAbout(ctx, d, C){
     txt(ctx, r[1], x+w-14, y+25, COL.txt, 'bold 14px monospace', 'right');
     y += 46;
   }
-  ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '11px monospace';
+  ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '12px monospace';
   y = wrap(ctx, '存档保存在本机（微信本地存储），换设备不互通；破纪录时排行榜得分自动上报。', x, y+14, w, 18);
   return wrap(ctx, '本作含激励视频广告（玩家主动触发）：看广告可复活、翻倍金币、领取金币，广告不影响战斗数值。', x, y+8, w, 18);
 }

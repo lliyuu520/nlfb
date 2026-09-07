@@ -188,7 +188,7 @@ function centerText(ctx, lines) {
   ctx.textAlign = 'center';
   lines.forEach((s, i) => {
     ctx.fillStyle = i === 0 ? COL.dim : 'rgba(156,163,175,0.6)';
-    ctx.font = (i === 0 ? 'bold 15px' : '13px') + ' monospace';
+    ctx.font = (i === 0 ? 'bold 15px' : '14px') + ' monospace';
     ctx.fillText(s, CONTENT.x + CONTENT.w / 2, CONTENT.y + 130 + i * 24);
   });
 }
@@ -218,7 +218,14 @@ function drawWorldRows(ctx) {
 
 function drawFriendRows(ctx) {
   if (!ODC || !ODC.canvas || ODC.canvas.width < 2) { centerText(ctx, ['当前基础库不支持好友榜']); return; }
-  ctx.drawImage(ODC.canvas, CONTENT.x, CONTENT.y, CONTENT.w, CONTENT.h);
+  // 子域把内容画在画布中央的 SUB_W:SUB_H 比例矩形（见 openDataContext/index.js contentRect），
+  // 真机 sharedCanvas 尺寸/比例不可控 —— 这里裁剪画布中央同比例区域拉伸铺满 CONTENT，
+  // 内容比例恒等于 CONTENT，任意画布尺寸下不变形、字号恒定
+  const c = ODC.canvas;
+  const ratio = 760 / 616;
+  let sw = c.width, sh = c.height;
+  if (sw / sh > ratio) { sw = sh * ratio; } else { sh = sw / ratio; }
+  ctx.drawImage(c, (c.width - sw) / 2, (c.height - sh) / 2, sw, sh, CONTENT.x, CONTENT.y, CONTENT.w, CONTENT.h);
 }
 
 function draw(ctx, W, H) {
@@ -231,7 +238,7 @@ function draw(ctx, W, H) {
   for (const tb of TABS) chip(ctx, tb, tab === tb.key ? glow : '#3a4356', tb.t, tab === tb.key ? '#fff' : COL.dim);
 
   // 我的记录条
-  ctx.textAlign = 'left'; ctx.font = '13px monospace';
+  ctx.textAlign = 'left'; ctx.font = '14px monospace';
   if (tab === 'world') {
     if (me) {
       ctx.fillStyle = me.custom ? COL.cyan : COL.dim;
@@ -252,7 +259,7 @@ function draw(ctx, W, H) {
   // 翻页
   if (tab === 'world' && world) {
     const maxPage = Math.max(0, Math.ceil(world.list.length / PAGE) - 1);
-    ctx.fillStyle = COL.dim; ctx.font = '13px monospace'; ctx.textAlign = 'center';
+    ctx.fillStyle = COL.dim; ctx.font = '14px monospace'; ctx.textAlign = 'center';
     ctx.fillText('第 ' + (worldPage + 1) + '/' + (maxPage + 1) + ' 页', PANEL.x + PANEL.w / 2, FOOT_L.y + 23);
   }
   chip(ctx, FOOT_L, '#3a4356', '◀', '#9feaff');
