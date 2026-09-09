@@ -70,36 +70,26 @@ const UI = {
     ctx.restore();
   },
 
-  // 绘制全息玻璃发光面板
+  // 旧调用名保留兼容；统一落到硬边切角组件，避免软阴影和圆角玻璃风格并存
   drawNeonPanel(ctx, x, y, w, h, title = '', glowColor = '#00f3ff') {
-    ctx.save();
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = 'rgba(10, 14, 30, 0.85)';
-    ctx.strokeStyle = glowColor;
-    ctx.lineWidth = 1.5;
-    this.roundedRect(ctx, x, y, w, h, 6);
-    ctx.fill();
-    ctx.stroke();
-
-    // 内部边角装饰线条
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x + 4, y + 4); ctx.lineTo(x + 12, y + 4);
-    ctx.moveTo(x + w - 12, y + 4); ctx.lineTo(x + w - 4, y + 4);
-    ctx.stroke();
-
+    this.drawChamferPanel(ctx, x, y, w, h, {
+      c: glowColor,
+      fill: 'rgba(10,14,30,0.9)',
+      cut: Math.min(8, Math.min(w, h) * 0.16),
+      halo: 0,
+      lw: 1.5
+    });
     if (title) {
+      ctx.save();
       ctx.fillStyle = glowColor;
       ctx.font = 'bold 12px monospace';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; // 固定对齐：调用方常处于 textAlign='center'，泄漏会把标题画到框外
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
       ctx.fillText(title, x + 10, y + 15);
+      ctx.restore();
     }
-    ctx.restore();
   },
 
-  // 绘制炫酷 Boss 血条（bottomInset：底部被手势条占据的高度，血条需在其上方）
+  // Boss 血条：硬边细描边，底部让开手势条
   drawBossBar(ctx, w, h, hp, maxhp, bottomInset) {
     const inset = bottomInset || 0;
     const barW = w - 80;
@@ -108,19 +98,12 @@ const UI = {
     const by = h - inset - 55;
 
     ctx.save();
-    ctx.shadowColor = '#ff0055';
-    ctx.shadowBlur = 12;
+    this.drawChamferPanel(ctx, bx, by, barW, barH, {
+      c: '#ff0055', fill: 'rgba(20,5,10,0.9)', cut: 3,
+      halo: 5, haloA: 0.12, lw: 1.5, ticks: false
+    });
 
-    // 背景槽
-    ctx.fillStyle = 'rgba(20, 5, 10, 0.85)';
-    ctx.strokeStyle = '#ff0055';
-    ctx.lineWidth = 2;
-    this.roundedRect(ctx, bx, by, barW, barH, 4);
-    ctx.fill();
-    ctx.stroke();
-
-    // 渐变血量填充（渐变对象缓存）
-    const ratio = Math.max(0, hp / maxhp);
+    const ratio = Math.max(0, Math.min(1, hp / maxhp));
     if (ratio > 0) {
       if (!_bossGrad) {
         _bossGrad = ctx.createLinearGradient(bx, by, bx + barW, by);
@@ -129,15 +112,15 @@ const UI = {
         _bossGrad.addColorStop(1, '#ffe600');
       }
       ctx.fillStyle = _bossGrad;
-      this.roundedRect(ctx, bx + 2, by + 2, (barW - 4) * ratio, barH - 4, 3);
+      const fillW = (barW - 4) * ratio;
+      this.chamferPath(ctx, bx + 2, by + 2, fillW, barH - 4, Math.min(2, fillW / 2));
       ctx.fill();
     }
 
-    // 告警文字
-    ctx.fillStyle = '#ff3366';
+    ctx.fillStyle = '#ff7a95';
     ctx.font = 'bold 12px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('⚡ 警告：核心目标 ⚡', w / 2, by - 6);
+    ctx.fillText('警告：核心目标', w / 2, by - 7);
     ctx.restore();
   }
 };

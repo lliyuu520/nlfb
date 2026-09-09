@@ -23,13 +23,9 @@ const TABS = [
 const ITEM_H = 48, ITEM_GAP = 8; // 菜单项尺寸与间距
 const PAD = 16; // 内容区内边距
 
-// 道具图鉴（与 main.js 掉落物一致；素材名随 CDN 预热清单，未就绪回退字母方块）
+// 当前唯一掉落物（与 main.js dropItem 一致；素材未就绪时回退字母方块）
 const ITEMS = [
-  { img:'Buff道具-02', c:'#ff4d4d', l:'R', n:'追踪机炮', d:'子弹自动追敌' },
-  { img:'掉落物-02',   c:'#4da6ff', l:'B', n:'穿透激光', d:'贯穿一整列敌人' },
-  { img:'Buff道具-06', c:'#ffd23c', l:'Y', n:'追踪导弹', d:'副武器自动索敌' },
-  { img:'掉落物-03',   c:'#c77dff', l:'P', n:'激光导弹', d:'副武器贯穿射线' },
-  { img:'掉落物-06',   c:'#7dff8c', l:'S', n:'得分徽章', d:'立刻加 500 分' },
+  { img:'掉落物-06', c:'#ffd23c', l:'¥', n:'金币袋', d:'拾取后增加本局金币' },
 ];
 const UPGRADE_META = {
   drop:  { n:'掉落率',   d:'提高道具掉落概率' },
@@ -44,19 +40,26 @@ let L = null;        // 布局缓存（每帧 draw 刷新，触摸命中使用�
 let hits = [];       // 每帧重建的可点击区 {x,y,w,h,fn,c,m}
 let dragMode = null, dragY = 0, dragBase = 0, dragMoved = false;
 let tip = '', tipUntil = 0;
+const wrapCache = {};
 
 const clamp = (v,a,b)=>v<a?a:v>b?b:v;
 const inRect = (t,b)=>t.x>=b.x&&t.x<=b.x+b.w&&t.y>=b.y&&t.y<=b.y+b.h;
 function txt(ctx,s,x,y,color,font,align){ ctx.fillStyle=color; ctx.font=font; ctx.textAlign=align||'left'; ctx.fillText(s,x,y); }
-// 按像素宽度断行（中文逐字断即可），返回下一行的 y
+// 静态文案按字体与宽度缓存断行结果，避免每帧逐字重复测量
 function wrap(ctx,s,x,y,maxW,lh){
   ctx.textAlign='left';
-  let line='', yy=y;
-  for(const ch of String(s)){
-    if(ctx.measureText(line+ch).width>maxW){ ctx.fillText(line,x,yy); yy+=lh; line=ch; }
-    else line+=ch;
+  const key=ctx.font+'|'+maxW+'|'+s;
+  let lines=wrapCache[key];
+  if(!lines){
+    lines=[];let line='';
+    for(const ch of String(s)){
+      if(line&&ctx.measureText(line+ch).width>maxW){lines.push(line);line=ch;}
+      else line+=ch;
+    }
+    if(line)lines.push(line);
+    wrapCache[key]=lines;
   }
-  if(line){ ctx.fillText(line,x,yy); yy+=lh; }
+  let yy=y;for(const line of lines){ctx.fillText(line,x,yy);yy+=lh;}
   return yy;
 }
 function hit(x,y,w,h,fn,inContent,inMenu){ hits.push({x,y,w,h,fn,c:!!inContent,m:!!inMenu}); }
@@ -144,9 +147,7 @@ function drawHeader(ctx, d){
   UI.drawNeonPanel(ctx, L.back.x, L.back.y, L.back.w, L.back.h, '', COL.pink);
   txt(ctx, '◀ 主页', L.back.x+L.back.w/2, L.back.y+22, '#ff7a95', 'bold 13px monospace', 'center');
   hit(L.back.x, L.back.y, L.back.w, L.back.h, ()=>{ call('click'); close(); });
-  ctx.save(); ctx.shadowColor = COL.cyan; ctx.shadowBlur = 12;
   txt(ctx, '设 置', L.W/2, h.y+30, '#9feaff', 'bold 20px monospace', 'center');
-  ctx.restore();
   UI.drawNeonPanel(ctx, L.coin.x, L.coin.y, L.coin.w, L.coin.h, '', COL.gold);
   txt(ctx, '◈ ' + (d.coins || 0), L.coin.x+L.coin.w/2, L.coin.y+22, COL.gold, 'bold 14px monospace', 'center');
 }
@@ -206,7 +207,7 @@ function drawPlay(ctx, d, C){
   ctx.strokeStyle = 'rgba(0,243,255,0.18)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+w, y); ctx.stroke();
   y += 26;
-  txt(ctx, '道具图鉴', x, y, COL.gold, 'bold 13px monospace');
+  txt(ctx, '掉落物', x, y, COL.gold, 'bold 13px monospace');
   for (const it of ITEMS) {
     y += 46;
     const img = CDN.get(it.img);
@@ -289,9 +290,7 @@ function drawShop(ctx, d, C){
   let y = C.y + 18;
   UI.drawNeonPanel(ctx, x, y, w, 62, '', COL.gold);
   txt(ctx, '金币余额', x+14, y+22, COL.dim, '12px monospace');
-  ctx.save(); ctx.shadowColor = COL.gold; ctx.shadowBlur = 10;
   txt(ctx, '◈ ' + (d.coins || 0), x+14, y+48, COL.gold, 'bold 24px monospace');
-  ctx.restore();
   if (!d.adOff) { // 首版 ADS_OFF：广告入口隐藏，余额下方直接排永久强化
     const ad = { x:x+w-122, y:y+14, w:108, h:34 };
     UI.drawNeonPanel(ctx, ad.x, ad.y, ad.w, ad.h, '', COL.gold);
@@ -356,9 +355,7 @@ function drawToggle(ctx, b, title, desc, on, color, fn){
 function drawAbout(ctx, d, C){
   const x = C.x + PAD, w = C.w - PAD*2;
   let y = C.y + 30;
-  ctx.save(); ctx.shadowColor = COL.cyan; ctx.shadowBlur = 18;
   txt(ctx, '怒雷风暴', C.x+C.w/2, y, '#9feaff', 'bold 26px monospace', 'center');
-  ctx.restore();
   txt(ctx, '版本 v' + (d.version || '0.0.0'), C.x+C.w/2, y+22, COL.dim, '12px monospace', 'center');
   y += 54;
   const rows = [

@@ -33,7 +33,7 @@ const TABS = [
   { key: 'friend', t: '好友榜', x: PANEL.x + 16, y: PANEL.y + 52, w: 190, h: 38 },
   { key: 'world', t: '世界榜', x: PANEL.x + 222, y: PANEL.y + 52, w: 190, h: 38 },
 ];
-const RENAME = { x: PANEL.x + PANEL.w - 84, y: PANEL.y + 96, w: 68, h: 28 };
+const RENAME = { x: PANEL.x + PANEL.w - 84, y: PANEL.y + 98, w: 68, h: 28 };
 const FOOT_L = { x: PANEL.x + 16, y: PANEL.y + 460, w: 56, h: 34 };
 const FOOT_R = { x: PANEL.x + PANEL.w - 72, y: PANEL.y + 460, w: 56, h: 34 };
 const CONTENT = { x: PANEL.x + 24, y: PANEL.y + 140, w: PANEL.w - 48, h: PAGE * 44 };
@@ -50,6 +50,10 @@ function layout(bottomInset, gameH) {
 }
 
 const inRect = (t, b) => t.x >= b.x && t.x <= b.x + b.w && t.y >= b.y && t.y <= b.y + b.h;
+const hitRect = (t, b) => {
+  const px = Math.max(0, (44 - b.w) / 2), py = Math.max(0, (44 - b.h) / 2);
+  return t.x >= b.x - px && t.x <= b.x + b.w + px && t.y >= b.y - py && t.y <= b.y + b.h + py;
+};
 const rankColor = r => r === 1 ? COL.gold : r === 2 ? '#c8d3ff' : r === 3 ? '#ffaa66' : COL.dim;
 
 function setup(o) {
@@ -152,16 +156,16 @@ function switchTab(key) {
 // ---------- 触摸（返回 true 表示已消费，主域不再处理） ----------
 
 function onTouch(t) {
-  if (inRect(t, CLOSE)) { if (onClose) onClose(); return true; }
-  for (const tb of TABS) { if (inRect(t, tb)) { switchTab(tb.key); return true; } }
+  if (hitRect(t, CLOSE)) { if (onClose) onClose(); return true; }
+  for (const tb of TABS) { if (hitRect(t, tb)) { switchTab(tb.key); return true; } }
   if (tab === 'friend') {
-    if (inRect(t, FOOT_L)) { friendPage--; postRender(); return true; }
-    if (inRect(t, FOOT_R)) { friendPage++; postRender(); return true; }
+    if (hitRect(t, FOOT_L)) { friendPage = Math.max(0, friendPage - 1); postRender(); return true; }
+    if (hitRect(t, FOOT_R)) { friendPage++; postRender(); return true; }
   } else {
     const maxPage = world ? Math.max(0, Math.ceil(world.list.length / PAGE) - 1) : 0;
-    if (inRect(t, FOOT_L)) { worldPage = Math.max(0, worldPage - 1); return true; }
-    if (inRect(t, FOOT_R)) { worldPage = Math.min(maxPage, worldPage + 1); return true; }
-    if (me && inRect(t, RENAME)) {
+    if (hitRect(t, FOOT_L)) { worldPage = Math.max(0, worldPage - 1); return true; }
+    if (hitRect(t, FOOT_R)) { worldPage = Math.min(maxPage, worldPage + 1); return true; }
+    if (me && hitRect(t, RENAME)) {
       wx.showModal({
         title: '修改昵称', editable: true, placeholderText: '最多 12 个字符',
         success: r => { if (r.confirm && r.content) rename(r.content); },
@@ -170,7 +174,7 @@ function onTouch(t) {
     }
     if (!world && worldErr && inRect(t, CONTENT)) { loadWorld(); return true; } // 失败重试
   }
-  return false; // 面板内未命中 → 主域关闭面板
+  return inRect(t, PANEL); // 面板内空白消费触摸，只有遮罩区域关闭
 }
 
 // ---------- 绘制 ----------

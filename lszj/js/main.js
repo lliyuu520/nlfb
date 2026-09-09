@@ -78,7 +78,8 @@ const player={x:W/2,y:H-90,r:5,hp:100,maxHp:100,inv:2,weapon:'std',wlevel:2,mis:
 
 
 const HUD_TOP=Math.max(safeTop+8,capBottom+8); // 顶部 HUD 起始 y：刘海之下，且低于右上角微信胶囊
-const PLAY_TOP=HUD_TOP+62; // 玩家可移动的最高位置（让开 HUD）
+const HUD_H=76;
+const PLAY_TOP=HUD_TOP+HUD_H; // 玩家可移动的最高位置与 HUD 实际底部一致
 // 触摸坐标：屏幕逻辑像素 → 游戏坐标（480×H 等比映射，H 已随设备比例自适应）
 const toGame=t=>({x:t.clientX*W/winW,y:t.clientY*H/winH});
 // 广告模块初始化：仅激励视频（复活/金币翻倍，玩家主动触发），无常驻 Banner
@@ -400,10 +401,11 @@ wx.onTouchStart(e => {
   if (state === 'over') {
     if (reviving) return;
     if (!ADS_OFF && reviveUsed<MAX_REVIVE && inRect(t,REVIVE_BTN)) { requestRevive(); return; }
-    if (inRect(t,OVER_COIN_BTN)) { requestSettleDouble(); return; }
+    if (!ADS_OFF && settleConverted>0 && !settleDoubled && inRect(t,OVER_COIN_BTN)) { requestSettleDouble(); return; }
     if (inRect(t,restartRect())) startGame();
     return;
   }
+  if (state === 'clear') return; // 通关动画只按原计时进入补给站，禁止触摸透传到标题逻辑
   if (state === 'pause') {
     for (const b of PAUSE_BTNS) {
       if (inRect(t, b)) {
@@ -425,7 +427,7 @@ wx.onTouchStart(e => {
     }
     if (inRect(t, shopHit(SHOP_REFRESH))) { requestShopRefresh(); return; }
     if (inRect(t, shopHit(SHOP_GO))) { Sfx.play('click'); nextStage(); return; }
-    if (inRect(t, shopHit(SHOP_ADCOIN))) { requestCoinDouble(); return; }
+    if (!ADS_OFF && inRect(t, shopHit(SHOP_ADCOIN))) { requestCoinDouble(); return; }
     return;
   }
   if (reviving) return; // 广告播放中忽略点击
@@ -972,17 +974,17 @@ function draw(){
     const blink=Math.floor(Date.now()/140)%2===0;
     ctx.globalAlpha=Math.min(1,warnT)*(blink?0.95:0.5);
     ctx.fillStyle='#ff2244';ctx.textAlign='center';ctx.font='bold 24px monospace';
-    ctx.fillText(boss&&boss.mini?'警 告 · 精 英 接 近':'警 告 · 首 领 接 近',W/2,H*0.3);
-    ctx.fillRect(W*0.12,H*0.3+18,W*0.76,2);
+    const wy=HUD_TOP+HUD_H+20;
+    ctx.fillText(boss&&boss.mini?'警 告 · 精 英 接 近':'警 告 · 首 领 接 近',W/2,wy);
+    ctx.fillRect(W*0.12,wy+18,W*0.76,2);
     ctx.globalAlpha=1;ctx.textAlign='left';
   }
   if(flash>0){ctx.fillStyle=`rgba(255,255,255,${flash})`;ctx.fillRect(-20,-20,W+40,H+40);}
   if(state==='clear'){ // 通关动画（2.4s）：大字+战果，播完自动进补给站
     ctx.textAlign='center';
     UI.drawNeonPanel(ctx,W/2-160,H/2-70,320,150,'战区肃清','#7dff8c');
-    ctx.save();ctx.shadowColor='#7dff8c';ctx.shadowBlur=20;
     ctx.fillStyle='#7dff8c';ctx.font='bold 38px monospace';
-    ctx.fillText('通关成功',W/2,H/2+5);ctx.restore();
+    ctx.fillText('通关成功',W/2,H/2+5);
     ctx.fillStyle='#fff';ctx.font='16px monospace';
     ctx.fillText(`第 ${stage} 关通过 · 得分 ${score}`,W/2,H/2+50);
     ctx.textAlign='left';
@@ -991,9 +993,8 @@ function draw(){
     ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
     ctx.textAlign='center';
     UI.drawNeonPanel(ctx,W/2-160,H/2-125,320,288,'最终战报','#ff0055');
-    ctx.save();ctx.shadowColor='#ff0055';ctx.shadowBlur=25;
     ctx.fillStyle='#ff0055';ctx.font='bold 42px monospace';
-    ctx.fillText('游戏结束',W/2,H/2-60);ctx.restore();
+    ctx.fillText('游戏结束',W/2,H/2-60);
     ctx.fillStyle='#fff';ctx.font='bold 20px monospace';
     ctx.fillText('得分  '+String(score).padStart(7,'0'),W/2,H/2-10);
     ctx.fillStyle='#ffe600';ctx.font='14px monospace';
@@ -1043,21 +1044,20 @@ function draw(){
 function overlay(){ctx.setTransform(SX,0,0,SY,0,0);if(scan){ctx.fillStyle=scan;ctx.fillRect(0,0,W,H);}}
 function drawTitle(){
   ctx.textAlign='center';
-  ctx.save();
-  ctx.shadowColor='#00f3ff'; ctx.shadowBlur=25;
   ctx.fillStyle='#00f3ff'; ctx.font='bold 56px monospace';
+  ctx.strokeStyle='#07394a';ctx.lineWidth=2;
+  ctx.strokeText('怒雷风暴',W/2,220);
   ctx.fillText('怒雷风暴',W/2,220);
-  ctx.shadowColor='#ff0055'; ctx.shadowBlur=15;
-  ctx.fillStyle='#ff0055'; ctx.font='16px monospace';
+  ctx.lineWidth=1;
+  ctx.fillStyle='#ff7a95'; ctx.font='16px monospace';
   ctx.fillText('赛博街机 · 弹幕射击',W/2,260);
-  ctx.restore();
 
   // 底部文案整体上移，让开刘海屏手势条（否则"最高分"会被压在遮挡区里）
   const tbi=bottomInset();
   ctx.fillStyle=Math.floor(Date.now()/400)%2?'#00f3ff':'#ff0055';
   ctx.font='bold 22px monospace';ctx.fillText('▶ 点击屏幕开始战斗 ◀',W/2,H-170-tbi);
 
-  ctx.fillStyle='#9ca3af';ctx.font='14px monospace';ctx.fillText('最高分: '+String(hi).padStart(7,'0'),W/2,H-130-tbi);
+  ctx.fillStyle='#cbd5e1';ctx.font='bold 14px monospace';ctx.fillText('最高分: '+String(hi).padStart(7,'0'),W/2,H-130-tbi);
 
   // 设置入口（右上角齿轮）：玩法/金币/战机/背景 收纳在设置面板
   UI.drawNeonPanel(ctx,SET_BTN.x,SET_BTN.y,SET_BTN.w,SET_BTN.h,'','#00f3ff');
@@ -1133,11 +1133,9 @@ function drawHUD(){
   ctx.fillStyle='rgba(220,205,130,0.75)';
   ctx.fillText('第 '+stage+' 关',W/2,HUD_TOP+14);
   ctx.restore();
-  ctx.save();ctx.shadowColor='#00f3ff';ctx.shadowBlur=10;
   ctx.fillStyle='#eaffff';ctx.font='bold 22px monospace';
   ctx.fillText(String(score).padStart(7,'0'),50,HUD_TOP+40);
-  ctx.restore();
-  ctx.save();ctx.textAlign='center';ctx.shadowColor='#ffe600';ctx.shadowBlur=10;
+  ctx.save();ctx.textAlign='center';
   if(boss){
     ctx.fillStyle=Math.floor(Date.now()/300)%2?'#ff5d5d':'#ffe600';
     ctx.font='bold 20px monospace';
@@ -1150,7 +1148,7 @@ function drawHUD(){
   }
   ctx.restore();
   // 金币（分数行右）+ 血条（武器行右）：随 HUD_TOP 整体排在微信胶囊之下，不再与其重叠
-  ctx.save();ctx.textAlign='right';ctx.shadowColor='#ffd23c';ctx.shadowBlur=6;
+  ctx.save();ctx.textAlign='right';
   ctx.fillStyle='#ffe600';ctx.font='bold 16px monospace';
   ctx.fillText('¥ '+runCoins,W-12,HUD_TOP+40);
   ctx.restore();
@@ -1165,10 +1163,8 @@ function drawHUD(){
     ctx.textAlign='left';
   }
   // 第二行：武器（左）
-  ctx.save();ctx.shadowColor='#ff0055';ctx.shadowBlur=6;
-  ctx.fillStyle='#ff7a95';ctx.font='14px monospace';
-  ctx.fillText('武器 '+(WPN_ZH[player.weapon]||player.weapon)+' '+player.wlevel+'级',12,HUD_TOP+66);
-  ctx.restore();
+  ctx.fillStyle='#ff9db6';ctx.font='14px monospace';
+  ctx.fillText('武器 '+(WPN_ZH[player.weapon]||player.weapon)+' '+player.wlevel+'级',50,HUD_TOP+66);
 
   // 顶部左上角静音喇叭（仅战斗中显示与响应，结算/暂停页不出现避免误触死区）
   if (state === 'playing'){ const mp=mutePos(); drawSpeaker(mp.x, mp.y, Sfx.sfxOn && Sfx.bgmOn); }
@@ -1181,6 +1177,14 @@ function drawHUD(){
 // 视觉=构图 B 霓虹线稿（稿见 drafts/ui/shop-redesign-v1.html #ab3）：切角描边 + 外圈宽描边模拟霓虹发光，全程零 shadowBlur
 // 牌面两套视觉通道分离：稀有度=色相（N 青 / R 金），购买力=描边与亮度（可买 / 差一点 / 买不起），买不起也不掉稀有度色相
 let shopHdGrad=null,shopBuildCache=null,shopBuildN=-1;
+const shopTextWidthCache={};
+function shopTextWidth(text,font){
+  const key=font+'|'+text;
+  if(shopTextWidthCache[key]==null){
+    ctx.save();ctx.font=font;shopTextWidthCache[key]=ctx.measureText(text).width;ctx.restore();
+  }
+  return shopTextWidthCache[key];
+}
 function shopBuildList(){ // 构筑摘要 7 格：等级降序，只在买牌后重算（避免每帧建数组+排序）
   if(shopBuildN!==runPicks){
     const list=[];
@@ -1233,8 +1237,8 @@ function drawShop(){
     ctx.textAlign='center';ctx.font=SFS(28,true);
     ctx.fillStyle=can?(CORE?'#ff9de6':(R?'#ffe9a0':'#5df0ff')):(near?'#8fa3bd':'#7f92ab');
     ctx.fillText(b.letter,ix+iw/2,iy+iw/2);
-    ctx.textAlign='left';ctx.font=SFS(17,true);
-    const nameW=ctx.measureText(b.name).width; // 量名宽需与绘制同字号，必须在换字体前取
+    ctx.textAlign='left';const nameFont=SFS(17,true);ctx.font=nameFont;
+    const nameW=shopTextWidth(b.name,nameFont);
     ctx.fillStyle=can?(CORE?'#ffd6f3':(R?'#fff8e0':'#eaffff')):(near?'#dfe9f5':'#8a9ab0');
     ctx.fillText(b.name,tx,c.y+sn(22)+sbl(17));
     ctx.font=SFS(12);ctx.fillStyle=can?(CORE?'#ff4dd2':(R?'#ffd23c':'#00f3ff')):'#5a6a80';
@@ -1245,7 +1249,7 @@ function drawShop(){
     // 稀有度角标（核心牌标「核」）
     ctx.font=SFS(11);
     const rlab=b.core?'核':b.rar;
-    const cw=ctx.measureText(rlab).width+sn(12),ch=sn(15),cx0=c.x+c.w-sn(14)-cw,cy0=c.y+sn(14);
+    const cw=shopTextWidth(rlab,SFS(11))+sn(12),ch=sn(15),cx0=c.x+c.w-sn(14)-cw,cy0=c.y+sn(14);
     const rcol=can?(CORE?'#ff4dd2':(R?'#ffd23c':'#00f3ff')):(near?(CORE?'rgba(255,77,210,0.8)':(R?'rgba(255,210,60,0.8)':'rgba(0,243,255,0.6)')):(CORE?'rgba(255,77,210,0.32)':(R?'rgba(255,210,60,0.32)':'rgba(0,243,255,0.26)')));
     ctx.strokeStyle=rcol;ctx.lineWidth=1;
     UI.chamferPath(ctx,cx0,cy0,cw,ch,sn(3));ctx.stroke();
@@ -1311,15 +1315,15 @@ function drawShop(){
   ctx.beginPath();ctx.moveTo(c2.x+c2.w-sn(16),ay-sn(5));ctx.lineTo(c2.x+c2.w-sn(9),ay);ctx.lineTo(c2.x+c2.w-sn(16),ay+sn(5));ctx.closePath();ctx.fill();
   ctx.fillStyle='rgba(125,255,140,0.5)';
   ctx.beginPath();ctx.moveTo(c2.x+c2.w-sn(24),ay-sn(5));ctx.lineTo(c2.x+c2.w-sn(17),ay);ctx.lineTo(c2.x+c2.w-sn(24),ay+sn(5));ctx.closePath();ctx.fill();
-  // 本关金币翻倍（每关 1 次；ADS_OFF 时整块入口不画，留白待恢复）
+  // 本关金币翻倍（每关 1 次；ADS_OFF 时整块入口不画）
   const c3=SHOP_ADCOIN,on=!ADS_OFF&&!coinDoubled&&runCoinIncome>0;
   if(!ADS_OFF){
-    UI.drawNeonPanel(ctx,c3.x,c3.y,c3.w,c3.h,{c:on?'#ffd23c':'#4a5a70',fill:on?'rgba(42,32,4,0.94)':'rgba(12,16,24,0.8)',cut:sn(8),halo:on?sn(6):0,haloA:0.16,lw:1.5,ticks:false});
+    UI.drawChamferPanel(ctx,c3.x,c3.y,c3.w,c3.h,{c:on?'#ffd23c':'#4a5a70',fill:on?'rgba(42,32,4,0.94)':'rgba(12,16,24,0.8)',cut:sn(8),halo:on?sn(6):0,haloA:0.16,lw:1.5,ticks:false});
     ctx.fillStyle=on?'#ffe600':'#5a6a80';ctx.font=SFS(13,true);
     ctx.fillText(coinDoubled?'本关金币已翻倍':(on?'▶ 看广告 本关金币翻倍 +'+runCoinIncome:'本关暂无金币收入'),c3.x+c3.w/2,c3.y+c3.h/2);
   }
-  // 本局构筑摘要：把散在各处的买牌收成一行，给下一关一个可读的"我现在的流派"
-  const c4=SHOP_BUILD;
+  // 本局构筑摘要：广告关闭时上移占用原广告区，不保留空洞
+  const c4=ADS_OFF?SHOP_ADCOIN:SHOP_BUILD;
   UI.drawChamferPanel(ctx,c4.x,c4.y,c4.w,c4.h,{c:'rgba(0,243,255,0.35)',fill:'rgba(8,12,22,0.9)',cut:sn(7),lw:1,ticks:false});
   ctx.fillStyle='rgba(180,210,235,0.78)';ctx.font=SFS(11);
   ctx.fillText('本局构筑 '+runPicks+' 张',c4.x+sn(12),c4.y+sn(8)+sbl(11));
@@ -1336,10 +1340,10 @@ function drawShop(){
   }
   if(runTopBuff.n>0){
     ctx.font=SFS(11);ctx.fillStyle='rgba(180,210,235,0.78)';
-    const k='最强 ';
-    ctx.fillText(k,c4.x+sn(12),c4.y+sn(28)+sbl(11));
+    const k='最强 ',kf=SFS(11);
+    ctx.font=kf;ctx.fillText(k,c4.x+sn(12),c4.y+sn(28)+sbl(11));
     ctx.fillStyle='#ffe600';ctx.font=SFS(11,true);
-    ctx.fillText(runTopBuff.name+' ×'+runTopBuff.n,c4.x+sn(12)+ctx.measureText(k).width,c4.y+sn(28)+sbl(11));
+    ctx.fillText(runTopBuff.name+' ×'+runTopBuff.n,c4.x+sn(12)+shopTextWidth(k,kf),c4.y+sn(28)+sbl(11));
   }
   ctx.restore();
 }
