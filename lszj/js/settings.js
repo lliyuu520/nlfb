@@ -7,18 +7,22 @@
 "use strict";
 const UI = require('./ui.js');
 const CDN = require('./cdn.js');
+const T = require('./theme.js'); // 军武航空仪表静态主题 token
 
-const COL = { cyan:'#00f3ff', pink:'#ff0055', gold:'#ffe600', green:'#7dff8c', purple:'#c77dff',
-  dim:'#8892a8', txt:'#e6eeff', idle:'#2b3b5c', lock:'#5c4a14' };
+// 语义别名 → 军武色板：六色 Tab 收敛为统一枪灰面板 + 琥珀选中灯
+const COL = { cyan:T.amber, pink:T.dangerHi, gold:T.amber, green:T.ok, purple:T.rareCore,
+  dim:T.textDim, txt:T.text, idle:T.stroke, lock:T.amberDim };
+const MF = T.fontData; // 数字/价格/版本号
+const UF = T.fontUI;   // 中文标签
 
-// 左侧菜单：c = 选中态主题色，icon = 程序化图标类型（不依赖字体字形）
+// 左侧菜单：c 统一收敛为琥珀选中灯（原六色 Tab 收敛），icon = 程序化图标类型（不依赖字体字形）
 const TABS = [
   { key:'play',  t:'玩法', c:COL.cyan,   icon:'play' },
   { key:'ship',  t:'战机', c:COL.cyan,   icon:'ship' },
-  { key:'theme', t:'背景', c:COL.green,  icon:'theme' },
-  { key:'shop',  t:'强化', c:COL.gold,   icon:'up' },
-  { key:'sound', t:'声音', c:COL.pink,   icon:'snd' },
-  { key:'about', t:'关于', c:COL.purple, icon:'info' },
+  { key:'theme', t:'背景', c:COL.cyan,   icon:'theme' },
+  { key:'shop',  t:'强化', c:COL.cyan,   icon:'up' },
+  { key:'sound', t:'声音', c:COL.cyan,   icon:'snd' },
+  { key:'about', t:'关于', c:COL.cyan,   icon:'info' },
 ];
 const ITEM_H = 48, ITEM_GAP = 8; // 菜单项尺寸与间距
 const PAD = 16; // 内容区内边距
@@ -145,11 +149,11 @@ function drawHeader(ctx, d){
   const h = L.head;
   UI.drawNeonPanel(ctx, h.x, h.y, h.w, h.h, '', COL.cyan);
   UI.drawNeonPanel(ctx, L.back.x, L.back.y, L.back.w, L.back.h, '', COL.pink);
-  txt(ctx, '◀ 主页', L.back.x+L.back.w/2, L.back.y+22, '#ff7a95', 'bold 13px monospace', 'center');
+  txt(ctx, '◀ 主页', L.back.x+L.back.w/2, L.back.y+22, COL.pink, 'bold 13px sans-serif', 'center');
   hit(L.back.x, L.back.y, L.back.w, L.back.h, ()=>{ call('click'); close(); });
-  txt(ctx, '设 置', L.W/2, h.y+30, '#9feaff', 'bold 20px monospace', 'center');
+  txt(ctx, '设 置', L.W/2, h.y+30, T.text, 'bold 20px sans-serif', 'center');
   UI.drawNeonPanel(ctx, L.coin.x, L.coin.y, L.coin.w, L.coin.h, '', COL.gold);
-  txt(ctx, '◈ ' + (d.coins || 0), L.coin.x+L.coin.w/2, L.coin.y+22, COL.gold, 'bold 14px monospace', 'center');
+  txt(ctx, '◈ ' + (d.coins || 0), L.coin.x+L.coin.w/2, L.coin.y+22, COL.gold, 'bold 14px '+MF, 'center');
 }
 
 function drawMenu(ctx){
@@ -160,10 +164,10 @@ function drawMenu(ctx){
     const y = M.y + 8 + i*(ITEM_H+ITEM_GAP) - menuScroll;
     if (y + ITEM_H < M.y || y > M.y + M.h) return; // 视口外跳过
     const on = tb.key === tab;
-    UI.drawNeonPanel(ctx, M.x+7, y, M.w-14, ITEM_H, '', on ? tb.c : '#1b2740');
+    UI.drawNeonPanel(ctx, M.x+7, y, M.w-14, ITEM_H, '', on ? tb.c : T.stroke);
     if (on) { ctx.fillStyle = tb.c; ctx.fillRect(M.x+7, y+8, 3, ITEM_H-16); } // 选中竖条
     drawIcon(ctx, tb.icon, M.x+26, y+ITEM_H/2, on ? tb.c : COL.dim);
-    txt(ctx, tb.t, M.x+44, y+ITEM_H/2+5, on ? '#fff' : COL.dim, on ? 'bold 14px monospace' : '13px monospace');
+    txt(ctx, tb.t, M.x+44, y+ITEM_H/2+5, on ? '#fff' : COL.dim, on ? 'bold 14px sans-serif' : '13px sans-serif');
     hit(M.x+7, y, M.w-14, ITEM_H, ()=>{ tab = tb.key; scroll = 0; lastH = 0; call('click'); }, false, true);
   });
   ctx.restore();
@@ -172,7 +176,7 @@ function drawMenu(ctx){
 function drawContent(ctx, d){
   const C = L.content;
   const tb = TABS.filter(t => t.key === tab)[0] || TABS[0];
-  UI.drawNeonPanel(ctx, C.x, C.y, C.w, C.h, '', tb.c);
+  UI.drawNeonPanel(ctx, C.x, C.y, C.w, C.h, '', T.strokeHi);
   ctx.save();
   ctx.beginPath(); ctx.rect(C.x+4, C.y+4, C.w-8, C.h-8); ctx.clip();
   ctx.translate(0, -scroll); // 内容坐标 = 未滚动的绝对 y，点击判定回加 scroll
@@ -188,8 +192,8 @@ function drawContent(ctx, d){
   if (lastH > C.h) { // 滚动指示条
     const th = Math.max(28, C.h*C.h/lastH);
     const ty = C.y + 6 + (C.h - 12 - th) * (scroll / Math.max(1, lastH - C.h));
-    ctx.fillStyle = 'rgba(0,243,255,0.12)'; ctx.fillRect(C.x+C.w-9, C.y+6, 3, C.h-12);
-    ctx.fillStyle = tb.c; ctx.fillRect(C.x+C.w-9, ty, 3, th);
+    ctx.fillStyle = UI.rgba(T.strokeHi,0.15); ctx.fillRect(C.x+C.w-9, C.y+6, 3, C.h-12);
+    ctx.fillStyle = T.amber; ctx.fillRect(C.x+C.w-9, ty, 3, th);
   }
 }
 
@@ -197,34 +201,34 @@ function drawContent(ctx, d){
 function drawPlay(ctx, d, C){
   const x = C.x + PAD, w = C.w - PAD*2;
   let y = C.y + 24;
-  txt(ctx, '操作说明', x, y, COL.gold, 'bold 13px monospace');
+  txt(ctx, '操作说明', x, y, COL.gold, 'bold 13px sans-serif');
   (d.tips || []).forEach(s => {
     y += 24;
     ctx.fillStyle = COL.cyan; ctx.fillRect(x+2, y-5, 4, 4);
-    txt(ctx, s, x+14, y, 'rgba(230,240,255,0.85)', '12px monospace');
+    txt(ctx, s, x+14, y, 'rgba(230,240,255,0.85)', '12px sans-serif');
   });
   y += 18;
-  ctx.strokeStyle = 'rgba(0,243,255,0.18)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = UI.rgba(T.stroke,0.6); ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+w, y); ctx.stroke();
   y += 26;
-  txt(ctx, '掉落物', x, y, COL.gold, 'bold 13px monospace');
+  txt(ctx, '掉落物', x, y, COL.gold, 'bold 13px sans-serif');
   for (const it of ITEMS) {
     y += 46;
     const img = CDN.get(it.img);
     if (img) ctx.drawImage(img, x+2, y-32, 28, 28);
     else {
       ctx.fillStyle = it.c; ctx.fillRect(x+2, y-32, 28, 28);
-      txt(ctx, it.l, x+16, y-13, '#0a0a12', 'bold 14px monospace', 'center');
+      txt(ctx, it.l, x+16, y-13, '#0a0a12', 'bold 14px sans-serif', 'center');
     }
-    txt(ctx, it.n, x+40, y-16, COL.txt, 'bold 12px monospace');
-    txt(ctx, it.d, x+40, y-1, COL.dim, '12px monospace');
+    txt(ctx, it.n, x+40, y-16, COL.txt, 'bold 12px sans-serif');
+    txt(ctx, it.d, x+40, y-1, COL.dim, '12px sans-serif');
   }
   y += 26;
-  txt(ctx, '关卡规则', x, y, COL.gold, 'bold 13px monospace');
+  txt(ctx, '关卡规则', x, y, COL.gold, 'bold 13px sans-serif');
   y += 12;
-  ctx.fillStyle = 'rgba(230,240,255,0.8)'; ctx.font = '12px monospace';
+  ctx.fillStyle = 'rgba(230,240,255,0.8)'; ctx.font = '12px sans-serif';
   y = wrap(ctx, '每关 55 秒后首领登场（第 1 关 35 秒），第 2 关起中途还有精英出击；击破首领即通关，可继续下一关或返回主页。', x, y, w, 20);
-  ctx.fillStyle = 'rgba(230,240,255,0.8)'; ctx.font = '12px monospace';
+  ctx.fillStyle = 'rgba(230,240,255,0.8)'; ctx.font = '12px sans-serif';
   y = wrap(ctx, d.adOff ? '阵亡即本局结束；过关与阵亡都按得分折算金币存入存款。' : '阵亡可看广告复活（每局 2 次）；过关与阵亡都按得分折算金币，结算页可看广告翻倍。', x, y+6, w, 20);
   return y;
 }
@@ -239,10 +243,10 @@ function drawShipTab(ctx, d, C){
     ctx.save(); ctx.translate(pv.x+54, pv.y+46); ctx.scale(1.5, 1.5);
     if (d.drawShip) d.drawShip(sk);
     ctx.restore();
-    txt(ctx, sk.name, pv.x+98, pv.y+40, '#eaffff', 'bold 16px monospace');
-    txt(ctx, '当前使用', pv.x+98, pv.y+62, COL.cyan, '12px monospace');
+    txt(ctx, sk.name, pv.x+98, pv.y+40, T.text, 'bold 16px sans-serif');
+    txt(ctx, '当前使用', pv.x+98, pv.y+62, COL.cyan, '12px sans-serif');
   }
-  txt(ctx, '涂装仅改变外观，不影响任何数值', pv.x+98, pv.y+82, COL.dim, '12px monospace');
+  txt(ctx, '涂装仅改变外观，不影响任何数值', pv.x+98, pv.y+82, COL.dim, '12px sans-serif');
   let y = pv.y + pv.h + 16;
   ships.forEach((s, i) => {
     const own = !!(d.owned && d.owned.ships && d.owned.ships[i]);
@@ -251,9 +255,9 @@ function drawShipTab(ctx, d, C){
     ctx.save(); ctx.translate(x+42, y+33); ctx.globalAlpha = own ? 1 : 0.4; ctx.scale(0.62, 0.62);
     if (d.drawShip) d.drawShip(s);
     ctx.restore();
-    txt(ctx, s.name, x+80, y+29, on ? '#9feaff' : own ? COL.txt : '#c9a227', own ? 'bold 13px monospace' : '13px monospace');
+    txt(ctx, s.name, x+80, y+29, on ? COL.cyan : own ? COL.txt : '#c9a227', own ? 'bold 13px sans-serif' : '13px sans-serif');
     txt(ctx, on ? '使用中' : own ? '点击选用' : '◈ ' + ((d.shipPrice && d.shipPrice[i]) || 0) + ' 解锁',
-      x+80, y+50, on ? COL.cyan : own ? COL.dim : '#c9a227', '12px monospace');
+      x+80, y+50, on ? COL.cyan : own ? COL.dim : '#c9a227', own ? '12px sans-serif' : '12px '+MF);
     hit(x, y, w, 66, ()=>call('pickShip', i), true);
     y += 76;
   });
@@ -264,8 +268,8 @@ function drawShipTab(ctx, d, C){
 function drawThemeTab(ctx, d, C){
   const bgs = d.bgs || [], x = C.x + PAD, w = C.w - PAD*2;
   let y = C.y + 22;
-  txt(ctx, '背景主题', x, y, COL.green, 'bold 13px monospace');
-  txt(ctx, '切换后主页与战斗背景同步生效', x+72, y, COL.dim, '12px monospace');
+  txt(ctx, '背景主题', x, y, COL.green, 'bold 13px sans-serif');
+  txt(ctx, '切换后主页与战斗背景同步生效', x+72, y, COL.dim, '12px sans-serif');
   y += 18;
   bgs.forEach((th, i) => {
     const own = !!(d.owned && d.owned.bgs && d.owned.bgs[i]);
@@ -275,9 +279,9 @@ function drawThemeTab(ctx, d, C){
     ctx.fillStyle = th.bg; ctx.fillRect(x+14, y+15, 32, 32);
     ctx.fillStyle = th.stars[2]; ctx.fillRect(x+22, y+23, 16, 16);
     ctx.restore();
-    txt(ctx, th.name, x+58, y+27, on ? '#a5ffb8' : own ? COL.txt : '#c9a227', own ? 'bold 13px monospace' : '13px monospace');
+    txt(ctx, th.name, x+58, y+27, on ? COL.green : own ? COL.txt : '#c9a227', own ? 'bold 13px sans-serif' : '13px sans-serif');
     txt(ctx, on ? '使用中' : own ? '点击选用' : '◈ ' + ((d.bgPrice && d.bgPrice[i]) || 0) + ' 解锁',
-      x+58, y+48, on ? COL.green : own ? COL.dim : '#c9a227', '12px monospace');
+      x+58, y+48, on ? COL.green : own ? COL.dim : '#c9a227', own ? '12px sans-serif' : '12px '+MF);
     hit(x, y, w, 62, ()=>call('pickBg', i), true);
     y += 72;
   });
@@ -289,16 +293,16 @@ function drawShop(ctx, d, C){
   const x = C.x + PAD, w = C.w - PAD*2;
   let y = C.y + 18;
   UI.drawNeonPanel(ctx, x, y, w, 62, '', COL.gold);
-  txt(ctx, '金币余额', x+14, y+22, COL.dim, '12px monospace');
-  txt(ctx, '◈ ' + (d.coins || 0), x+14, y+48, COL.gold, 'bold 24px monospace');
+  txt(ctx, '金币余额', x+14, y+22, COL.dim, '12px sans-serif');
+  txt(ctx, '◈ ' + (d.coins || 0), x+14, y+48, COL.gold, 'bold 24px '+MF);
   if (!d.adOff) { // 首版 ADS_OFF：广告入口隐藏，余额下方直接排永久强化
     const ad = { x:x+w-122, y:y+14, w:108, h:34 };
     UI.drawNeonPanel(ctx, ad.x, ad.y, ad.w, ad.h, '', COL.gold);
-    txt(ctx, '看广告 +' + (d.reward || 50), ad.x+ad.w/2, ad.y+22, '#fff3b0', 'bold 13px monospace', 'center');
+    txt(ctx, '看广告 +' + (d.reward || 50), ad.x+ad.w/2, ad.y+22, '#fff3b0', 'bold 13px '+MF, 'center');
     hit(ad.x, ad.y, ad.w, ad.h, ()=>call('ad'), true);
   }
   y += d.adOff ? 18 : 76;
-  txt(ctx, '永久强化', x, y+10, COL.gold, 'bold 13px monospace');
+  txt(ctx, '永久强化', x, y+10, COL.gold, 'bold 13px sans-serif');
   y += 26;
   for (const id of ['drop', 'power']) {
     const def = d.upsDef && d.upsDef[id];
@@ -306,20 +310,20 @@ function drawShop(ctx, d, C){
     const lv = (d.ups && d.ups[id]) || 0, maxed = lv >= def.max, cost = def.cost(lv);
     const meta = UPGRADE_META[id] || { n:id, d:'' };
     UI.drawNeonPanel(ctx, x, y, w, 84, '', maxed ? COL.green : COL.gold);
-    txt(ctx, meta.n, x+14, y+26, maxed ? COL.green : COL.txt, 'bold 15px monospace');
-    txt(ctx, meta.d + ' · 每级 +' + Math.round((def.val(1) - def.val(0))*100) + '%', x+14, y+46, COL.dim, '12px monospace');
+    txt(ctx, meta.n, x+14, y+26, maxed ? COL.green : COL.txt, 'bold 15px sans-serif');
+    txt(ctx, meta.d + ' · 每级 +' + Math.round((def.val(1) - def.val(0))*100) + '%', x+14, y+46, COL.dim, '12px sans-serif');
     for (let i = 0; i < def.max; i++) { // 等级点阵
       ctx.fillStyle = i < lv ? (maxed ? COL.green : COL.gold) : 'rgba(255,255,255,0.15)';
       ctx.fillRect(x+14+i*16, y+56, 12, 8);
     }
-    txt(ctx, maxed ? '已满级' : 'Lv' + lv + ' → ' + (lv+1), x+14, y+76, maxed ? COL.green : COL.dim, '12px monospace');
+    txt(ctx, maxed ? '已满级' : 'Lv' + lv + ' → ' + (lv+1), x+14, y+76, maxed ? COL.green : COL.dim, '12px '+MF);
     const bb = { x:x+w-104, y:y+44, w:90, h:32 };
     UI.drawNeonPanel(ctx, bb.x, bb.y, bb.w, bb.h, '', maxed ? COL.green : COL.gold);
-    txt(ctx, maxed ? '满级' : '◈ ' + cost, bb.x+bb.w/2, bb.y+21, maxed ? '#0b1a0f' : '#0f1206', 'bold 13px monospace', 'center');
+    txt(ctx, maxed ? '满级' : '◈ ' + cost, bb.x+bb.w/2, bb.y+21, maxed ? '#0b1a0f' : '#0f1206', 'bold 13px '+MF, 'center');
     hit(bb.x, bb.y, bb.w, bb.h, ()=>call('buy', id), true);
     y += 96;
   }
-  ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '12px monospace';
+  ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '12px sans-serif';
   return wrap(ctx, d.adOff ? '强化永久生效并保存在本机；金币通过对局结算获得。' : '强化永久生效并保存在本机；金币通过看广告与对局结算获得。', x, y+10, w, 18);
 }
 
@@ -327,26 +331,26 @@ function drawShop(ctx, d, C){
 function drawSound(ctx, d, C){
   const x = C.x + PAD, w = C.w - PAD*2;
   let y = C.y + 22;
-  txt(ctx, '声音设置', x, y, COL.pink, 'bold 13px monospace');
+  txt(ctx, '声音设置', x, y, COL.pink, 'bold 13px sans-serif');
   y += 20;
   y = drawToggle(ctx, { x:x, y:y, w:w, h:64 }, '音效', '按钮、射击与爆炸反馈', !!d.sfxOn, COL.cyan, ()=>call('sfx'));
   y = drawToggle(ctx, { x:x, y:y, w:w, h:64 }, '背景音乐', '战斗 BGM（CDN 加载）', !!d.bgmOn, COL.green, ()=>call('bgm'));
-  ctx.fillStyle = COL.dim; ctx.font = '12px monospace';
+  ctx.fillStyle = COL.dim; ctx.font = '12px sans-serif';
   return wrap(ctx, '两项都关 = 全局静音。主页顶部的喇叭按钮可一键切换，设置立即生效并记住。', x, y+6, w, 18);
 }
 
 function drawToggle(ctx, b, title, desc, on, color, fn){
   UI.drawNeonPanel(ctx, b.x, b.y, b.w, b.h, '', on ? color : COL.idle);
-  txt(ctx, title, b.x+14, b.y+27, on ? '#eaffff' : COL.dim, 'bold 14px monospace');
-  txt(ctx, desc, b.x+14, b.y+48, COL.dim, '12px monospace');
+  txt(ctx, title, b.x+14, b.y+27, on ? T.text : COL.dim, 'bold 14px sans-serif');
+  txt(ctx, desc, b.x+14, b.y+48, COL.dim, '12px sans-serif');
   const sw = { x:b.x+b.w-66, y:b.y+18, w:52, h:28 };
-  ctx.fillStyle = on ? 'rgba(0,243,255,0.18)' : 'rgba(255,255,255,0.08)';
+  ctx.fillStyle = on ? UI.rgba(T.amber,0.18) : 'rgba(255,255,255,0.08)';
   UI.roundedRect(ctx, sw.x, sw.y, sw.w, sw.h, 14); ctx.fill();
-  ctx.strokeStyle = on ? color : '#4a5568'; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = on ? color : T.stroke; ctx.lineWidth = 1.5;
   UI.roundedRect(ctx, sw.x, sw.y, sw.w, sw.h, 14); ctx.stroke();
-  ctx.fillStyle = on ? color : '#6b7686';
+  ctx.fillStyle = on ? color : T.textFaint;
   ctx.beginPath(); ctx.arc(on ? sw.x+sw.w-14 : sw.x+14, sw.y+sw.h/2, 10, 0, 7); ctx.fill();
-  txt(ctx, on ? '开' : '关', on ? sw.x+14 : sw.x+sw.w-14, sw.y+19, on ? '#06202a' : '#1b2233', 'bold 12px monospace', 'center');
+  txt(ctx, on ? '开' : '关', on ? sw.x+14 : sw.x+sw.w-14, sw.y+19, on ? '#06202a' : '#1b2233', 'bold 12px sans-serif', 'center');
   hit(b.x, b.y, b.w, b.h, fn, true);
   return b.y + b.h + 14;
 }
@@ -355,8 +359,8 @@ function drawToggle(ctx, b, title, desc, on, color, fn){
 function drawAbout(ctx, d, C){
   const x = C.x + PAD, w = C.w - PAD*2;
   let y = C.y + 30;
-  txt(ctx, '怒雷风暴', C.x+C.w/2, y, '#9feaff', 'bold 26px monospace', 'center');
-  txt(ctx, '版本 v' + (d.version || '0.0.0'), C.x+C.w/2, y+22, COL.dim, '12px monospace', 'center');
+  txt(ctx, '怒雷风暴', C.x+C.w/2, y, T.text, 'bold 26px sans-serif', 'center');
+  txt(ctx, '版本 v' + (d.version || '0.0.0'), C.x+C.w/2, y+22, COL.dim, '12px '+MF, 'center');
   y += 54;
   const rows = [
     ['最高分', String(d.hi || 0)],
@@ -366,11 +370,11 @@ function drawAbout(ctx, d, C){
   ];
   for (const r of rows) {
     UI.drawNeonPanel(ctx, x, y, w, 38, '', COL.idle);
-    txt(ctx, r[0], x+14, y+25, COL.dim, '12px monospace');
-    txt(ctx, r[1], x+w-14, y+25, COL.txt, 'bold 14px monospace', 'right');
+    txt(ctx, r[0], x+14, y+25, COL.dim, '12px sans-serif');
+    txt(ctx, r[1], x+w-14, y+25, COL.txt, 'bold 14px '+MF, 'right');
     y += 46;
   }
-  ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '12px monospace';
+  ctx.fillStyle = 'rgba(230,240,255,0.75)'; ctx.font = '12px sans-serif';
   y = wrap(ctx, '存档保存在本机（微信本地存储），换设备不互通；破纪录时排行榜得分自动上报。', x, y+14, w, 18);
   if (!d.adOff) return wrap(ctx, '本作含激励视频广告（玩家主动触发）：看广告可复活、翻倍金币、领取金币，广告不影响战斗数值。', x, y+8, w, 18);
   return y;
@@ -388,7 +392,7 @@ function drawTip(ctx){
   ctx.save(); ctx.globalAlpha = Math.min(1, (tipUntil - Date.now())/350);
   ctx.fillStyle = 'rgba(8,14,28,0.92)'; ctx.strokeStyle = COL.gold; ctx.lineWidth = 1.5;
   UI.roundedRect(ctx, x, y, w, 30, 6); ctx.fill(); ctx.stroke();
-  txt(ctx, tip, x+w/2, y+20, COL.gold, 'bold 13px monospace', 'center');
+  txt(ctx, tip, x+w/2, y+20, COL.gold, 'bold 13px sans-serif', 'center');
   ctx.restore();
 }
 

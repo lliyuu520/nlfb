@@ -1,6 +1,7 @@
 
 "use strict";
 const UI = require('./ui.js');
+const T = require('./theme.js'); // 军武航空仪表静态主题 token
 const Ads = require('./ads.js');
 const Rank = require('./rank.js');
 const CDN = require('./cdn.js');
@@ -114,10 +115,10 @@ function requestSettleDouble(){
 }
 const WPN_ZH={std:'机炮',homing:'追踪',laser:'激光'}; // HUD 武器中文名
 // 暂停菜单按钮（双击屏幕呼出）
-const PAUSE_BTNS=[
-  {x:W/2-100,y:H/2-84,w:200,h:44,c:'#00f3ff',t:'继续游戏'},
-  {x:W/2-100,y:H/2-28,w:200,h:44,c:'#ff0055',t:'重新开始'},
-  {x:W/2-100,y:H/2+28,w:200,h:44,c:'#ffe600',t:'回到标题'},
+const PAUSE_BTNS=[ // 飞控冻结面板按钮（顺序/文案/热区不变，仅换军武语义色）
+  {x:W/2-100,y:H/2-84,w:200,h:44,c:T.ok,t:'继续游戏'},
+  {x:W/2-100,y:H/2-28,w:200,h:44,c:T.danger,t:'重新开始'},
+  {x:W/2-100,y:H/2+28,w:200,h:44,c:T.amber,t:'回到标题'},
 ];
 const inRect=(t,b)=>t.x>=b.x&&t.x<=b.x+b.w&&t.y>=b.y&&t.y<=b.y+b.h;
 function toast(s){msg=s;msgT=2.2;}
@@ -166,6 +167,13 @@ const TIPS=['[ 拖动屏幕 ] 控制战机移动并自动射击','[ 击杀敌机
 const SET_BTN={x:W-92,y:HUD_TOP+4,w:80,h:40}; // 主页右上角设置入口（打开独立设置页）
 const RANK_BTN={x:20,y:HUD_TOP+4,w:80,h:40}; // 主页左上角排行榜入口（与设置入口镜像）
 const SND_BTN={x:W/2-40,y:HUD_TOP+4,w:80,h:40}; // 主页顶部居中：全局声音总开关（SFX+BGM 一键全关/全开）
+// 标题屏静态绘制对象：提为模块级常量，避免每帧分配（评审 P2 收口）
+const TITLE_NAMEPLATE={x:38,y:158,w:W-76,h:118}; // 任务铭牌矩形
+const TITLE_KEY_SET={x:SET_BTN.x,y:SET_BTN.y,w:SET_BTN.w,h:SET_BTN.h};
+const TITLE_KEY_RANK={x:RANK_BTN.x,y:RANK_BTN.y,w:RANK_BTN.w,h:RANK_BTN.h};
+const TITLE_KEY_SND={x:SND_BTN.x,y:SND_BTN.y,w:SND_BTN.w,h:SND_BTN.h};
+const TITLE_SIL_SKIN={body:'#131924',fin:'#0F141E',trail:null}; // 待机剪影涂装（trail=null 不画拖尾，防随机闪跳）
+const TITLE_SIGNS=[-1,1];
 // 战斗中静音按钮放顶部左上角（得分左侧，与主页顶部声音开关呼应）：右上角是微信胶囊按钮地盘，放那儿会被盖住还可能误触退出菜单
 const mutePos=()=>({x:26,y:HUD_TOP+27}); // 与 drawHUD 中的小喇叭位置保持一致
 const REWARD_COINS=50; // 每次完整观看激励视频奖励金币
@@ -221,7 +229,8 @@ const sr=(x,y,w,h)=>({x:SHOP_PANEL.x+x*SHOP_K,y:SHOP_PANEL.y+y*SHOP_K,w:w*SHOP_K
 const sx=v=>SHOP_PANEL.x+v*SHOP_K, sy=v=>SHOP_PANEL.y+v*SHOP_K;
 const sn=v=>v*SHOP_K;                      // 设计稿长度 → 实际像素
 const sbl=n=>n*0.62*SHOP_K;                // 字号 → 文本框视觉中线偏移（配合 textBaseline='middle'）
-const SFS=(n,b)=>(b?'bold ':'')+Math.max(10,Math.round(n*SHOP_K))+'px monospace'; // 字号随面板缩放（下限 10：低于此真机 CJK 笔画粘连）
+const SFS=(n,b)=>(b?'bold ':'')+Math.max(10,Math.round(n*SHOP_K))+'px '+T.fontData; // 数据字号随面板缩放（下限 10：低于此真机 CJK 笔画粘连）
+const SFL=(n,b)=>(b?'bold ':'')+Math.max(10,Math.round(n*SHOP_K))+'px '+T.fontUI;   // 中文标签字号（sans-serif）
 const SHOP_HEAD=sr(14,12,372,36);
 const SHOP_CARDS=[0,1,2].map(i=>sr(20,118+i*120,360,96));       // 卡间距 24
 const SHOP_SEC={x:sx(20),y:sy(466),w:360*SHOP_K};
@@ -378,7 +387,6 @@ Settings.setup({
 });
 
 let drag=null;
-let dbgTap=null; // TEMP DEBUG: 触摸坐标校准准星，校准后删除
 const DBG_AID=false; // TEMP DEBUG: 调试辅助（网格坐标线+玩家定位十字），上线前置 false
 const DBG_GOD=false; // TEMP DEBUG: 调试无敌（挂机验证商店/Boss 流程用），上线前置 false
 // 双击暂停检测：两次"干净点按"（快速按下-抬起且未移动）间隔 <350ms 且位置相近
@@ -388,7 +396,6 @@ wx.onTouchStart(e => {
   const touch = e.touches[0];
   if (!touch) return;
   const t = toGame(touch);
-  dbgTap={x:t.x,y:t.y,t:30}; // TEMP DEBUG
   if (Ads.onTouchStart(t)) return; // 模拟广告展示中：点击只作用于广告层
   if (state === 'playing') {
     // 静音按钮（顶部左上角小喇叭）：先于拖动判定吞掉点按，不带动机体移动
@@ -758,10 +765,6 @@ function hurtPlayer(dmg){ // 血条制：敌弹 20 / 撞机 25 / Boss 撞 35，�
 const stars=[];
 for(let i=0;i<80;i++){const l=Math.random();
   stars.push({x:Math.random()*W,y:Math.random()*H,v:25+l*135,s:l<0.5?1:(l<0.85?2:3),l:l<0.5?0:(l<0.85?1:2)});}
-// 扫描线纹理：小游戏无 DOM，必须用 wx.createCanvas() 创建离屏画布（document 不存在）
-const sl=wx.createCanvas();sl.width=4;sl.height=4;
-{const c=sl.getContext('2d');c.fillStyle='rgba(0,0,0,0.16)';c.fillRect(0,2,4,2);}
-const scan=ctx.createPattern(sl,'repeat');
 
 // 精灵恒为"大图缩小"绘制，开高质量下采样，避免缩小时出现锯齿/闪烁
 try{ctx.imageSmoothingEnabled=true;if('imageSmoothingQuality' in ctx)ctx.imageSmoothingQuality='high';}catch(e){}
@@ -846,7 +849,7 @@ function drawShipShape(sk){
   ctx.beginPath();ctx.moveTo(0,-17);ctx.lineTo(5,-3);ctx.lineTo(17,9);ctx.lineTo(7,7);ctx.lineTo(4,13);
   ctx.lineTo(-4,13);ctx.lineTo(-7,7);ctx.lineTo(-17,9);ctx.lineTo(-5,-3);ctx.closePath();ctx.fill();
   ctx.fillStyle=sk.fin;ctx.fillRect(-3,-12,6,9);
-  ctx.fillStyle=sk.trail;ctx.fillRect(-3,13,6,3+Math.random()*5);
+  if(sk.trail){ctx.fillStyle=sk.trail;ctx.fillRect(-3,13,6,3+Math.random()*5);} // trail=null 时不画拖尾（标题剪影防随机闪跳）
 }
 function drawShip(){
   const p=player;if(p.inv>0&&!DBG_GOD&&Math.floor(p.inv*16)%2)return; // DBG_GOD 常驻无敌会让闪烁恒隐身，调试时跳过
@@ -938,8 +941,8 @@ function draw(){
     ctx.globalAlpha=k*0.7;ctx.strokeStyle='#8cbeff';ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(m.x-m.vx*0.05,m.y-m.vy*0.05);ctx.stroke();}
   ctx.globalAlpha=1;
-  if(state==='settings'){Settings.draw(ctx,W,H);overlay();Ads.draw(ctx);return;} // 设置页：独立全屏页面，不叠在标题页上
-  if(state==='title'||state==='rank'){drawTitle();if(state==='rank')Rank.draw(ctx,W,H);overlay();Ads.draw(ctx);return;}
+  if(state==='settings'){Settings.draw(ctx,W,H);Ads.draw(ctx);return;} // 设置页：独立全屏页面，不叠在标题页上
+  if(state==='title'||state==='rank'){drawTitle();if(state==='rank')Rank.draw(ctx,W,H);Ads.draw(ctx);return;}
   // 实体
   for(const it of items)drawItem(it);
   for(const e of enemies)drawEnemy(e);
@@ -970,141 +973,189 @@ function draw(){
   drawHUD();
   if(state==='playing')drawTutorial();
   if(state==='shop')drawShop();
-  if(state==='playing'&&warnT>0){ // 首领/精英出场警告横幅
+  if(state==='playing'&&warnT>0){ // 首领/精英出场：航空警戒条（斜纹带 + 闪烁文案）
     const blink=Math.floor(Date.now()/140)%2===0;
-    ctx.globalAlpha=Math.min(1,warnT)*(blink?0.95:0.5);
-    ctx.fillStyle='#ff2244';ctx.textAlign='center';ctx.font='bold 24px monospace';
     const wy=HUD_TOP+HUD_H+20;
-    ctx.fillText(boss&&boss.mini?'警 告 · 精 英 接 近':'警 告 · 首 领 接 近',W/2,wy);
-    ctx.fillRect(W*0.12,wy+18,W*0.76,2);
+    ctx.globalAlpha=Math.min(1,warnT)*(blink?0.95:0.55);
+    UI.hazardStrip(ctx,W*0.12,wy-18,W*0.76,26,T.danger);
+    ctx.fillStyle=T.dangerHi;ctx.textAlign='center';ctx.font='bold 22px '+T.fontUI;
+    ctx.fillText(boss&&boss.mini?'警 告 · 精 英 接 近':'警 告 · 首 领 接 近',W/2,wy+3);
     ctx.globalAlpha=1;ctx.textAlign='left';
   }
   if(flash>0){ctx.fillStyle=`rgba(255,255,255,${flash})`;ctx.fillRect(-20,-20,W+40,H+40);}
-  if(state==='clear'){ // 通关动画（2.4s）：大字+战果，播完自动进补给站
+  if(state==='clear'){ // 任务完成报告（2.4s）：大字+战果，播完自动进补给站
     ctx.textAlign='center';
-    UI.drawNeonPanel(ctx,W/2-160,H/2-70,320,150,'战区肃清','#7dff8c');
-    ctx.fillStyle='#7dff8c';ctx.font='bold 38px monospace';
+    UI.drawNeonPanel(ctx,W/2-160,H/2-70,320,150,'战区肃清',T.ok);
+    ctx.fillStyle=T.okHi;ctx.font='bold 38px '+T.fontUI;
     ctx.fillText('通关成功',W/2,H/2+5);
-    ctx.fillStyle='#fff';ctx.font='16px monospace';
+    ctx.fillStyle=T.text;ctx.font='16px '+T.fontData;
     ctx.fillText(`第 ${stage} 关通过 · 得分 ${score}`,W/2,H/2+50);
     ctx.textAlign='left';
   }
   if(state==='over'){
     ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
     ctx.textAlign='center';
-    UI.drawNeonPanel(ctx,W/2-160,H/2-125,320,288,'最终战报','#ff0055');
-    ctx.fillStyle='#ff0055';ctx.font='bold 42px monospace';
+    UI.drawNeonPanel(ctx,W/2-160,H/2-125,320,288,'最终战报',T.danger);
+    ctx.fillStyle=T.dangerHi;ctx.font='bold 42px '+T.fontUI;
     ctx.fillText('游戏结束',W/2,H/2-60);
-    ctx.fillStyle='#fff';ctx.font='bold 20px monospace';
+    ctx.fillStyle=T.text;ctx.font='bold 20px '+T.fontData;
     ctx.fillText('得分  '+String(score).padStart(7,'0'),W/2,H/2-10);
-    ctx.fillStyle='#ffe600';ctx.font='14px monospace';
+    ctx.fillStyle=T.amber;ctx.font='14px '+T.fontData;
     ctx.fillText('最高分  '+String(hi).padStart(7,'0'),W/2,H/2+20);
     if(settleConverted>0){
-      ctx.fillStyle='#ffe600';ctx.font='bold 15px monospace';
+      ctx.fillStyle=T.amber;ctx.font='bold 15px '+T.fontData;
       ctx.fillText('剩余金币 '+runCoins+' · 存款 +'+(settleDoubled?settleConverted*2:settleConverted)+(settleDoubled?' · 已翻倍':''),W/2,H/2+42);
     }
     // 复活 / 重新开始按钮
     if(!ADS_OFF&&reviveUsed<MAX_REVIVE){
-      UI.drawNeonPanel(ctx,REVIVE_BTN.x,REVIVE_BTN.y,REVIVE_BTN.w,REVIVE_BTN.h,'复活机会 '+(MAX_REVIVE-reviveUsed),'#00f3ff');
-      ctx.fillStyle=reviving?'#666':'#00f3ff';ctx.font='bold 15px monospace';
+      UI.drawNeonPanel(ctx,REVIVE_BTN.x,REVIVE_BTN.y,REVIVE_BTN.w,REVIVE_BTN.h,'复活机会 '+(MAX_REVIVE-reviveUsed),T.strokeHi);
+      ctx.fillStyle=reviving?T.textFaint:T.text;ctx.font='bold 15px '+T.fontUI;
       ctx.fillText(reviving?'加载中...':'▶ 看广告复活',REVIVE_BTN.x+REVIVE_BTN.w/2,REVIVE_BTN.y+34);
     }
     const rb=restartRect();
-    UI.drawNeonPanel(ctx,rb.x,rb.y,rb.w,rb.h,'再来一局','#ff0055');
-    ctx.fillStyle='#fff';ctx.font='bold 15px monospace';
+    UI.drawNeonPanel(ctx,rb.x,rb.y,rb.w,rb.h,'再来一局',T.danger);
+    ctx.fillStyle=T.text;ctx.font='bold 15px '+T.fontUI;
     ctx.fillText('重新开始',rb.x+rb.w/2,rb.y+34);
     if(settleConverted>0&&!settleDoubled&&!ADS_OFF){
-      UI.drawNeonPanel(ctx,OVER_COIN_BTN.x,OVER_COIN_BTN.y,OVER_COIN_BTN.w,OVER_COIN_BTN.h,'','#ffe600');
-      ctx.fillStyle=reviving?'#666':'#ffe600';ctx.font='bold 15px monospace';
+      UI.drawNeonPanel(ctx,OVER_COIN_BTN.x,OVER_COIN_BTN.y,OVER_COIN_BTN.w,OVER_COIN_BTN.h,'',T.amber);
+      ctx.fillStyle=reviving?T.textFaint:T.amberHi;ctx.font='bold 15px '+T.fontUI;
       ctx.fillText(reviving?'加载中...':'▶ 看广告 存款翻倍',OVER_COIN_BTN.x+OVER_COIN_BTN.w/2,OVER_COIN_BTN.y+25);
     }
     drawRunSummary();
   }
-  if(state==='pause'){
+  if(state==='pause'){ // 飞控冻结报告：按钮顺序/文案/热区不变
     ctx.setTransform(SX,0,0,SY,0,0); // 摆脱震动偏移，菜单稳定
-    ctx.fillStyle='rgba(2,4,10,0.72)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=UI.rgba(T.bg,0.78);ctx.fillRect(0,0,W,H);
     ctx.textAlign='center';
-    UI.drawNeonPanel(ctx,W/2-128,H/2-124,256,196,'已暂停','#00f3ff');
+    UI.drawNeonPanel(ctx,W/2-128,H/2-124,256,196,'已暂停',T.amber);
     for(const b of PAUSE_BTNS){
       UI.drawNeonPanel(ctx,b.x,b.y,b.w,b.h,'',b.c);
-      ctx.fillStyle=b.c;ctx.font='bold 16px monospace';
+      ctx.fillStyle=b.c;ctx.font='bold 16px '+T.fontUI;
       ctx.fillText(b.t,b.x+b.w/2,b.y+28);
     }
   }
   if(msgT>0){
     ctx.save();ctx.globalAlpha=Math.min(1,msgT);
-    ctx.fillStyle='#ffe600';ctx.font='bold 14px monospace';ctx.textAlign='center';
+    ctx.fillStyle=T.amber;ctx.font='bold 14px '+T.fontUI;ctx.textAlign='center';
     ctx.fillText(msg,W/2,H/2+188);ctx.restore();
   }
   if(DBG_AID)drawDebugAid();
-  if(dbgTap){ctx.save();ctx.strokeStyle='#00ff00';ctx.lineWidth=2;ctx.beginPath();ctx.arc(dbgTap.x,dbgTap.y,14,0,7);ctx.stroke();ctx.fillStyle='#00ff00';ctx.font='bold 16px monospace';ctx.textAlign='left';ctx.fillText(Math.round(dbgTap.x)+','+Math.round(dbgTap.y),dbgTap.x+18,dbgTap.y);ctx.restore();} // TEMP DEBUG
-  overlay();
   Ads.draw(ctx); // 模拟激励视频为覆盖层，最后绘制压在所有 UI 之上
 }
-function overlay(){ctx.setTransform(SX,0,0,SY,0,0);if(scan){ctx.fillStyle=scan;ctx.fillRect(0,0,W,H);}}
+// 标题页：任务铭牌（航空刻度 + 任务编号）+ 待机战机能见轮廓 + 琥珀呼吸开始提示
 function drawTitle(){
   ctx.textAlign='center';
-  ctx.fillStyle='#00f3ff'; ctx.font='bold 56px monospace';
-  ctx.strokeStyle='#07394a';ctx.lineWidth=2;
-  ctx.strokeText('怒雷风暴',W/2,220);
-  ctx.fillText('怒雷风暴',W/2,220);
+
+  // 待机战机剪影：停机位上的深色大轮廓，压在标题铭牌之下（低密度装饰，不抢信息）
+  ctx.save();
+  ctx.translate(W/2,H*0.66);ctx.scale(7.2,7.2);
+  ctx.globalAlpha=0.5;
+  drawShipShape(TITLE_SIL_SKIN);
+  ctx.restore();
+
+  // 任务铭牌：不对称装甲切角 + 顶部航空刻度 + 序列号 + 角部短刻度
+  const np=TITLE_NAMEPLATE;
+  UI.drawChamferPanel(ctx,np.x,np.y,np.w,np.h,{c:T.strokeHi,fill:T.panel,cut:14,asym:true,lw:2});
+  // 铭牌顶部航空刻度带（0-10 长刻度 + 细分短刻度）
+  ctx.strokeStyle=UI.rgba(T.strokeHi,0.55);ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let i=0;i<=40;i++){
+    const tx=np.x+np.w*0.24+i*(np.w*0.52/40),long=i%4===0;
+    ctx.moveTo(tx,np.y-4);ctx.lineTo(tx,np.y-4-(long?7:3.5));
+  }
+  ctx.stroke();
+  ctx.fillStyle=T.textFaint;ctx.font='9px '+T.fontData;
+  ctx.fillText('0',np.x+np.w*0.24,np.y-14);
+  ctx.fillText('5',np.x+np.w*0.5,np.y-14);
+  ctx.fillText('10',np.x+np.w*0.76,np.y-14);
+  // 任务编号（左）与密级角标（右）
+  ctx.textAlign='left';ctx.fillStyle=T.textFaint;ctx.font='10px '+T.fontData;
+  ctx.fillText('SERIAL/NR-01',np.x+16,np.y+18);
+  ctx.textAlign='right';ctx.fillStyle=T.amber;
+  ctx.fillText('★ 5',np.x+np.w-16,np.y+18);
+  ctx.textAlign='center';
+
+  // 标题：橙色挤出层（右下偏移）+ 黑硬描边 + 米白正面字
+  const ty=np.y+68;
+  ctx.font='bold 56px '+T.fontUI;
+  ctx.fillStyle=T.amberDim;
+  ctx.fillText('怒雷风暴',W/2+3,ty+3);
+  ctx.strokeStyle='#05070B';ctx.lineWidth=4;
+  ctx.strokeText('怒雷风暴',W/2,ty);
+  ctx.fillStyle=T.text;
+  ctx.fillText('怒雷风暴',W/2,ty);
   ctx.lineWidth=1;
-  ctx.fillStyle='#ff7a95'; ctx.font='16px monospace';
-  ctx.fillText('赛博街机 · 弹幕射击',W/2,260);
+
+  // 副标题：弹幕射击，两侧斜杠纹饰
+  ctx.fillStyle=T.textDim;ctx.font='bold 15px '+T.fontUI;
+  ctx.fillText('弹 幕 射 击',W/2,ty+34);
+  ctx.strokeStyle=UI.rgba(T.strokeHi,0.4);ctx.lineWidth=2;
+  for(const s of TITLE_SIGNS){
+    ctx.beginPath();
+    for(let i=0;i<5;i++){const bx0=W/2+s*(86+i*9);
+      ctx.moveTo(bx0,ty+36);ctx.lineTo(bx0+s*5,ty+28);}
+    ctx.stroke();
+  }
 
   // 底部文案整体上移，让开刘海屏手势条（否则"最高分"会被压在遮挡区里）
   const tbi=bottomInset();
-  ctx.fillStyle=Math.floor(Date.now()/400)%2?'#00f3ff':'#ff0055';
-  ctx.font='bold 22px monospace';ctx.fillText('▶ 点击屏幕开始战斗 ◀',W/2,H-170-tbi);
+  // 开始提示：琥珀色亮度呼吸（正弦调透明度，不再双色交替）
+  UI.hazardStrip(ctx,56,H-186-tbi,W-112,4,T.amber);
+  const br=0.55+0.45*Math.sin(Date.now()/380);
+  ctx.save();ctx.globalAlpha=br;
+  ctx.fillStyle=T.amberHi;ctx.font='bold 22px '+T.fontUI;
+  ctx.fillText('点击屏幕开始战斗',W/2,H-158-tbi);
+  ctx.restore();
 
-  ctx.fillStyle='#cbd5e1';ctx.font='bold 14px monospace';ctx.fillText('最高分: '+String(hi).padStart(7,'0'),W/2,H-130-tbi);
+  // 最高分：低亮度军用数据样式
+  ctx.fillStyle=T.textFaint;ctx.font='bold 14px '+T.fontData;
+  ctx.fillText('最高分 '+String(hi).padStart(7,'0'),W/2,H-128-tbi);
 
-  // 设置入口（右上角齿轮）：玩法/金币/战机/背景 收纳在设置面板
-  UI.drawNeonPanel(ctx,SET_BTN.x,SET_BTN.y,SET_BTN.w,SET_BTN.h,'','#00f3ff');
+  // 装甲功能键：设置（右上齿轮）/ 排行（左上军衔章）/ 声音（顶部居中喇叭），入口与坐标不变
+  UI.instButton(ctx,TITLE_KEY_SET);
   drawGear(SET_BTN.x+26,SET_BTN.y+20,10);
-  ctx.fillStyle='#9feaff';ctx.font='bold 14px monospace';ctx.textAlign='left';
+  ctx.fillStyle=T.text;ctx.font='bold 14px '+T.fontUI;ctx.textAlign='left';
   ctx.fillText('设置',SET_BTN.x+44,SET_BTN.y+25);
-  // 排行榜入口（左上角领奖台图标）：好友榜 + 世界榜
-  UI.drawNeonPanel(ctx,RANK_BTN.x,RANK_BTN.y,RANK_BTN.w,RANK_BTN.h,'','#ff0055');
-  drawPodium(RANK_BTN.x+24,RANK_BTN.y+24);
-  ctx.fillStyle='#ffb8c9';ctx.font='bold 14px monospace';ctx.textAlign='left';
+  UI.instButton(ctx,TITLE_KEY_RANK);
+  drawRankChevrons(RANK_BTN.x+24,RANK_BTN.y+22);
+  ctx.fillStyle=T.text;ctx.font='bold 14px '+T.fontUI;ctx.textAlign='left';
   ctx.fillText('排行',RANK_BTN.x+40,RANK_BTN.y+25);
-  // 全局声音开关（顶部居中喇叭）：双开亮绿，任一关闭即灰暗静音样式
   const sndOn=Sfx.sfxOn&&Sfx.bgmOn;
-  UI.drawNeonPanel(ctx,SND_BTN.x,SND_BTN.y,SND_BTN.w,SND_BTN.h,'',sndOn?'#ffe600':'#4a5568');
+  TITLE_KEY_SND.on=sndOn;
+  UI.instButton(ctx,TITLE_KEY_SND);
   drawSpeaker(SND_BTN.x+24,SND_BTN.y+20,sndOn);
-  ctx.fillStyle=sndOn?'#fff3b0':'#6b7686';ctx.font='bold 14px monospace';ctx.textAlign='left';
+  ctx.fillStyle=sndOn?T.text:T.textFaint;ctx.font='bold 14px '+T.fontUI;ctx.textAlign='left';
   ctx.fillText(sndOn?'声音':'静音',SND_BTN.x+42,SND_BTN.y+25);
   ctx.textAlign='center';
 }
 // 喇叭图标：箱体+锥形+声波弧（开）/斜杠（静音），程序化绘制避免字形渲染差异
 function drawSpeaker(x,y,on){
   ctx.save();
-  ctx.strokeStyle=ctx.fillStyle=on?'#ffe66d':'#6b7686';ctx.lineWidth=2;
+  ctx.strokeStyle=ctx.fillStyle=on?T.amberHi:T.textFaint;ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(x-9,y-4);ctx.lineTo(x-3,y-4);ctx.lineTo(x+4,y-11);
   ctx.lineTo(x+4,y+11);ctx.lineTo(x-3,y+4);ctx.lineTo(x-9,y+4);ctx.closePath();ctx.fill();
   if(on){
     ctx.beginPath();ctx.arc(x+6,y,7,-0.9,0.9);ctx.stroke();
     ctx.beginPath();ctx.arc(x+6,y,12,-0.8,0.8);ctx.stroke();
   }else{
-    ctx.strokeStyle='#ff5d7a';ctx.lineWidth=2.5;
+    ctx.strokeStyle=T.dangerHi;ctx.lineWidth=2.5;
     ctx.beginPath();ctx.moveTo(x+7,y-8);ctx.lineTo(x+16,y+8);
     ctx.moveTo(x+16,y-8);ctx.lineTo(x+7,y+8);ctx.stroke();
   }
   ctx.restore();
 }
-// 领奖台图标：三根高低柱（排行榜入口用，避免依赖奖杯字形的渲染差异）
-function drawPodium(x,y){
+// 军衔章图标：三道 V 形军衔杠（排行榜入口用，程序化绘制避免字形差异）
+function drawRankChevrons(x,y){
   ctx.save();
-  ctx.fillStyle='#ff7a95';ctx.fillRect(x-14,y-8,7,8);
-  ctx.fillStyle='#ffb8c9';ctx.fillRect(x-6,y-13,7,13);
-  ctx.fillStyle='#ff7a95';ctx.fillRect(x+2,y-6,7,6);
+  ctx.strokeStyle=T.amberHi;ctx.lineWidth=2.5;ctx.lineJoin='miter';
+  for(let i=0;i<3;i++){const cy=y-8+i*7;
+    ctx.beginPath();ctx.moveTo(x-9,cy-3);ctx.lineTo(x,cy+3);ctx.lineTo(x+9,cy-3);ctx.stroke();}
   ctx.restore();
 }
 // 齿轮图标：外圈 + 8 齿 + 中孔（避免依赖 ⚙ 字形的渲染差异）
 function drawGear(x,y,r){
   ctx.save();
-  ctx.strokeStyle='#9feaff';ctx.fillStyle='#9feaff';ctx.lineWidth=2;
+  ctx.strokeStyle=T.strokeHi;ctx.fillStyle=T.strokeHi;ctx.lineWidth=2;
   ctx.beginPath();ctx.arc(x,y,r*0.62,0,7);ctx.stroke();
   for(let i=0;i<8;i++){const a=i*Math.PI/4;
     ctx.fillRect(x+Math.cos(a)*r*0.78-2,y+Math.sin(a)*r*0.78-2,4,4);}
@@ -1116,55 +1167,63 @@ function drawTutorial(){
   if(tutDone||stage>1||runTime>=8)return;
   const a=0.55+0.45*Math.sin(runTime*5);
   ctx.save();ctx.globalAlpha=a;ctx.textAlign='center';
-  ctx.fillStyle='#eaffff';ctx.font='bold 17px monospace';
+  ctx.fillStyle=T.text;ctx.font='bold 17px '+T.fontUI;
   ctx.fillText('拖动屏幕 移动机体 · 自动开火',W/2,H*0.62);
-  ctx.fillStyle='#ffe600';ctx.font='13px monospace';
+  ctx.fillStyle=T.amber;ctx.font='13px '+T.fontUI;
   ctx.fillText('击毁敌机拾金币 · 小心红色弹幕',W/2,H*0.62+26);
   ctx.restore();
 }
-// HUD：纯发光文字，不再画面板底框（去框减少视野遮挡与"网页卡片"感）
+// HUD：航空仪表风——细刻度、钢灰分隔线、米白数据、琥珀状态（无面板底框，减少视野遮挡）
 function drawHUD(){
   ctx.setTransform(SX,0,0,SY,0,0);
   ctx.textAlign='left'; // 显式钉死对齐，避免其他状态遗留的 center 泄漏
   // 第一行：得分（左）/ 关卡与倒计时（中）/ 生命（右）
-  ctx.fillStyle='rgba(150,200,235,0.75)';ctx.font='12px monospace';
+  ctx.fillStyle=UI.rgba(T.textDim,0.75);ctx.font='12px '+T.fontUI;
   ctx.fillText('得分',50,HUD_TOP+14); // 左移让位给顶部左上角静音喇叭
   ctx.save();ctx.textAlign='center';
-  ctx.fillStyle='rgba(220,205,130,0.75)';
+  ctx.fillStyle=UI.rgba(T.amber,0.75);
   ctx.fillText('第 '+stage+' 关',W/2,HUD_TOP+14);
   ctx.restore();
-  ctx.fillStyle='#eaffff';ctx.font='bold 22px monospace';
+  ctx.fillStyle=T.text;ctx.font='bold 22px '+T.fontData;
   ctx.fillText(String(score).padStart(7,'0'),50,HUD_TOP+40);
   ctx.save();ctx.textAlign='center';
   if(boss){
-    ctx.fillStyle=Math.floor(Date.now()/300)%2?'#ff5d5d':'#ffe600';
-    ctx.font='bold 20px monospace';
+    ctx.fillStyle=Math.floor(Date.now()/300)%2?T.dangerHi:T.amber;
+    ctx.font='bold 20px '+T.fontUI;
     ctx.fillText(boss.mini?'精英!!':'首领!!',W/2,HUD_TOP+40);
   }else{
     const cd=Math.max(0,Math.ceil(bossAt()-elapsed));
-    ctx.fillStyle=cd<=10?'#ff5d5d':'#ffe600';
-    ctx.font='bold 20px monospace';
+    ctx.fillStyle=cd<=10?T.dangerHi:T.amber;
+    ctx.font='bold 20px '+T.fontData;
     ctx.fillText(cd+'秒',W/2,HUD_TOP+40);
   }
   ctx.restore();
   // 金币（分数行右）+ 血条（武器行右）：随 HUD_TOP 整体排在微信胶囊之下，不再与其重叠
   ctx.save();ctx.textAlign='right';
-  ctx.fillStyle='#ffe600';ctx.font='bold 16px monospace';
+  ctx.fillStyle=T.amber;ctx.font='bold 16px '+T.fontData;
   ctx.fillText('¥ '+runCoins,W-12,HUD_TOP+40);
   ctx.restore();
   {
+    // 机体结构值：玩家血量绿/黄/红阈值保留，装甲槽式量表
     const bw=96,bx=W-12-bw,by=HUD_TOP+58,hpr=clamp(player.hp/player.maxHp,0,1);
-    ctx.fillStyle='rgba(90,20,30,0.72)';ctx.fillRect(bx,by,bw,10);
-    ctx.fillStyle=hpr>0.35?'#7dff8c':(hpr>0.18?'#ffd23c':'#ff5d5d');
+    ctx.fillStyle=T.panelDeep;ctx.fillRect(bx,by,bw,10);
+    ctx.fillStyle=hpr>0.35?T.ok:(hpr>0.18?T.warn:T.danger);
     ctx.fillRect(bx,by,bw*hpr,10);
-    ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;ctx.strokeRect(bx-0.5,by-0.5,bw+1,11);
-    ctx.textAlign='right';ctx.fillStyle='#fff';ctx.font='11px monospace';
+    ctx.strokeStyle=UI.rgba(T.strokeHi,0.5);ctx.lineWidth=1;ctx.strokeRect(bx-0.5,by-0.5,bw+1,11);
+    ctx.textAlign='right';ctx.fillStyle=T.text;ctx.font='11px '+T.fontData;
     ctx.fillText(Math.ceil(player.hp)+'/'+player.maxHp,W-13,by+9);
     ctx.textAlign='left';
   }
-  // 第二行：武器（左）
-  ctx.fillStyle='#ff9db6';ctx.font='14px monospace';
+  // 第二行：武器（左）+ HUD 底部细刻度分隔线
+  ctx.fillStyle=T.textDim;ctx.font='14px '+T.fontUI;
   ctx.fillText('武器 '+(WPN_ZH[player.weapon]||player.weapon)+' '+player.wlevel+'级',50,HUD_TOP+66);
+  ctx.strokeStyle=UI.rgba(T.stroke,0.55);ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(12,HUD_TOP+HUD_H-2);ctx.lineTo(W-12,HUD_TOP+HUD_H-2);ctx.stroke();
+  ctx.strokeStyle=UI.rgba(T.strokeHi,0.5);
+  ctx.beginPath();
+  for(let i=0;i<=10;i++){const tx=12+(W-24)*i/10;
+    ctx.moveTo(tx,HUD_TOP+HUD_H-2);ctx.lineTo(tx,HUD_TOP+HUD_H-2+(i%5===0?5:2.5));}
+  ctx.stroke();
 
   // 顶部左上角静音喇叭（仅战斗中显示与响应，结算/暂停页不出现避免误触死区）
   if (state === 'playing'){ const mp=mutePos(); drawSpeaker(mp.x, mp.y, Sfx.sfxOn && Sfx.bgmOn); }
@@ -1174,8 +1233,9 @@ function drawHUD(){
   }
 }
 // 补给站（shop 态）：土豆兄弟式波次选购——三张牌带价格，买了出新三张，多轮消费到点"出战"
-// 视觉=构图 B 霓虹线稿（稿见 drafts/ui/shop-redesign-v1.html #ab3）：切角描边 + 外圈宽描边模拟霓虹发光，全程零 shadowBlur
-// 牌面两套视觉通道分离：稀有度=色相（N 青 / R 金），购买力=描边与亮度（可买 / 差一点 / 买不起），买不起也不掉稀有度色相
+// 视觉=军械补给终端：枪灰托盘、弹药舱式图标槽、琥珀价格与出战指令，全程零 shadowBlur / 零 halo
+// 牌面两套视觉通道分离：稀有度=色相（N 冷钢蓝 / R 琥珀金 / 核心 低饱和警戒紫红），
+// 购买力=描边与亮度（可买 / 差一点 / 买不起），买不起也不掉稀有度色相
 let shopHdGrad=null,shopBuildCache=null,shopBuildN=-1;
 const shopTextWidthCache={};
 function shopTextWidth(text,font){
@@ -1202,147 +1262,147 @@ function shopBuildList(){ // 构筑摘要 7 格：等级降序，只在买牌后
 function drawShop(){
   ctx.save();
   ctx.textBaseline='middle';ctx.textAlign='left';
-  ctx.fillStyle='rgba(2,4,12,0.72)';ctx.fillRect(0,0,W,H);
-  UI.drawChamferPanel(ctx,SHOP_PANEL.x,SHOP_PANEL.y,SHOP_PANEL.w,SHOP_PANEL.h,{c:'#ffd23c',fill:'#080c18',cut:sn(14),halo:sn(9),haloA:0.14});
-  // 标题带：左金右暗（面板坐标恒定，渐变对象建一次复用）
+  ctx.fillStyle=UI.rgba(T.bg,0.78);ctx.fillRect(0,0,W,H);
+  UI.drawChamferPanel(ctx,SHOP_PANEL.x,SHOP_PANEL.y,SHOP_PANEL.w,SHOP_PANEL.h,{c:T.strokeHi,fill:T.panel,cut:sn(14),asym:true});
+  // 标题带：左琥珀右枪灰（面板坐标恒定，渐变对象建一次复用）
   if(!shopHdGrad){
     shopHdGrad=ctx.createLinearGradient(SHOP_HEAD.x,0,SHOP_HEAD.x+SHOP_HEAD.w,0);
-    shopHdGrad.addColorStop(0,'rgba(58,42,4,0.95)');shopHdGrad.addColorStop(0.62,'rgba(14,16,28,0.95)');
+    shopHdGrad.addColorStop(0,'rgba(74,52,22,0.95)');shopHdGrad.addColorStop(0.62,'rgba(35,42,53,0.95)');
   }
-  UI.drawChamferPanel(ctx,SHOP_HEAD.x,SHOP_HEAD.y,SHOP_HEAD.w,SHOP_HEAD.h,{c:'#ffd23c',fill:shopHdGrad,cut:sn(7),halo:sn(5),haloA:0.16,lw:1,ticks:false});
-  ctx.fillStyle='#ffe600';ctx.font=SFS(17,true);
+  UI.drawChamferPanel(ctx,SHOP_HEAD.x,SHOP_HEAD.y,SHOP_HEAD.w,SHOP_HEAD.h,{c:T.amber,fill:shopHdGrad,cut:sn(7),lw:1,ticks:false,inner:false});
+  ctx.fillStyle=T.amberHi;ctx.font=SFL(17,true);
   ctx.fillText('补 给 站 · 第 '+stage+' 关',sx(28),sy(21)+sbl(17));
-  ctx.textAlign='right';ctx.fillStyle='rgba(255,210,60,0.5)';ctx.font=SFS(11);
+  ctx.textAlign='right';ctx.fillStyle=UI.rgba(T.amber,0.55);ctx.font=SFS(11);
   ctx.fillText('STATION 0'+stage,sx(375),sy(26)+sbl(11));
   // 余额（主视觉）+ 本关收入（右侧次级）
-  ctx.textAlign='left';ctx.fillStyle='#ffe600';ctx.font=SFS(29,true);
+  ctx.textAlign='left';ctx.fillStyle=T.amberHi;ctx.font=SFS(29,true);
   ctx.fillText('¥ '+runCoins,sx(16),sy(56)+sbl(29));
-  ctx.textAlign='right';ctx.fillStyle='#7dff8c';ctx.font=SFS(13,true);
+  ctx.textAlign='right';ctx.fillStyle=T.okHi;ctx.font=SFS(13,true);
   ctx.fillText('本关收入 +'+runCoinIncome,sx(384),sy(64)+sbl(13));
-  if(coinDoubled){ctx.fillStyle='#ffe600';ctx.font=SFS(11);ctx.fillText('已翻倍',sx(384),sy(80)+sbl(11));}
+  if(coinDoubled){ctx.fillStyle=T.amber;ctx.font=SFL(11);ctx.fillText('已翻倍',sx(384),sy(80)+sbl(11));}
   ctx.textAlign='left';
   // 三张随机强化牌
   for(let i=0;i<3;i++){
     const b=offer[i];if(!b)continue;
     const c=SHOP_CARDS[i],R=b.rar==='R',CORE=b.core,p=priceOf(b),can=runCoins>=p;
+    const rc0=CORE?T.rareCore:(R?T.rareR:T.rareN); // 稀有度主色
     const near=!can&&runCoins>=p*0.55; // 差一点：给余额进度条与差额，引导"再杀几架"
     UI.drawChamferPanel(ctx,c.x,c.y,c.w,c.h,{
-      c:can?(CORE?'#ff4dd2':(R?'#ffd23c':'#00f3ff')):(near?'rgba(255,120,150,0.75)':(CORE?'rgba(255,77,210,0.45)':'#4a5a70')), // 核心牌全程品红：远处也认得出"这是攒钱目标"
-      fill:can?'#0a0e1a':(near?'#0a0e1e':'#0e121c'),
-      cut:sn(10),halo:can?sn(7):0,haloA:CORE?0.22:(R?0.18:0.16),lw:1.5,ticks:false});
-    // 图标块：25 个线稿图标尚未产出，先沿用道具单字（亮度随购买力降级，底色保留稀有度）
+      c:can?rc0:(near?UI.rgba(T.dangerHi,0.75):(CORE?UI.rgba(T.rareCore,0.45):T.stroke)), // 核心牌全程紫红：远处也认得出"这是攒钱目标"
+      fill:can?T.panel2:(near?T.panel2:T.panelDeep),
+      cut:sn(10),lw:1.5,ticks:false});
+    // 弹药舱式图标槽：切角舱位 + 稀有度色单字（亮度随购买力降级，舱底保留稀有度）
     const iw=sn(54),ix=c.x+sn(12),iy=c.y+sn(21),tx=c.x+sn(78);
-    ctx.fillStyle=can?(CORE?'rgba(255,77,210,0.16)':(R?'rgba(255,210,60,0.16)':'rgba(0,243,255,0.14)')):(near?'rgba(140,160,190,0.10)':'rgba(120,140,170,0.14)');
+    ctx.fillStyle=can?UI.rgba(rc0,0.15):(near?'rgba(140,160,190,0.10)':UI.rgba(rc0,0.08));
     UI.chamferPath(ctx,ix,iy,iw,iw,sn(7));ctx.fill();
+    ctx.strokeStyle=can?UI.rgba(rc0,0.5):UI.rgba(T.strokeHi,0.3);ctx.lineWidth=1;
+    UI.chamferPath(ctx,ix,iy,iw,iw,sn(7));ctx.stroke();
     ctx.textAlign='center';ctx.font=SFS(28,true);
-    ctx.fillStyle=can?(CORE?'#ff9de6':(R?'#ffe9a0':'#5df0ff')):(near?'#8fa3bd':'#7f92ab');
+    ctx.fillStyle=can?rc0:(near?'#8fa3bd':T.textFaint);
     ctx.fillText(b.letter,ix+iw/2,iy+iw/2);
-    ctx.textAlign='left';const nameFont=SFS(17,true);ctx.font=nameFont;
+    ctx.textAlign='left';const nameFont=SFL(17,true);ctx.font=nameFont;
     const nameW=shopTextWidth(b.name,nameFont);
-    ctx.fillStyle=can?(CORE?'#ffd6f3':(R?'#fff8e0':'#eaffff')):(near?'#dfe9f5':'#8a9ab0');
+    ctx.fillStyle=can?T.text:(near?'#c9d2dd':T.textFaint);
     ctx.fillText(b.name,tx,c.y+sn(22)+sbl(17));
-    ctx.font=SFS(12);ctx.fillStyle=can?(CORE?'#ff4dd2':(R?'#ffd23c':'#00f3ff')):'#5a6a80';
+    ctx.font=SFS(12);ctx.fillStyle=can?rc0:T.textFaint;
     ctx.fillText('Lv'+(buffLv(b.id)+1)+'/'+b.max,tx+nameW+sn(6),c.y+sn(22)+sbl(17));
-    ctx.font=SFS(12);
-    ctx.fillStyle=can?(CORE?'rgba(255,180,230,0.75)':(R?'rgba(255,233,190,0.72)':'rgba(180,210,235,0.85)')):(near?'rgba(180,200,225,0.5)':'rgba(150,168,190,0.4)');
+    ctx.font=SFL(12);
+    ctx.fillStyle=can?UI.rgba(T.textDim,0.9):(near?UI.rgba(T.textDim,0.55):UI.rgba(T.textDim,0.4));
     ctx.fillText(b.desc,tx,c.y+sn(50)+sbl(12));
     // 稀有度角标（核心牌标「核」）
     ctx.font=SFS(11);
     const rlab=b.core?'核':b.rar;
     const cw=shopTextWidth(rlab,SFS(11))+sn(12),ch=sn(15),cx0=c.x+c.w-sn(14)-cw,cy0=c.y+sn(14);
-    const rcol=can?(CORE?'#ff4dd2':(R?'#ffd23c':'#00f3ff')):(near?(CORE?'rgba(255,77,210,0.8)':(R?'rgba(255,210,60,0.8)':'rgba(0,243,255,0.6)')):(CORE?'rgba(255,77,210,0.32)':(R?'rgba(255,210,60,0.32)':'rgba(0,243,255,0.26)')));
+    const rcol=can?rc0:(near?UI.rgba(rc0,0.8):UI.rgba(rc0,0.32));
     ctx.strokeStyle=rcol;ctx.lineWidth=1;
     UI.chamferPath(ctx,cx0,cy0,cw,ch,sn(3));ctx.stroke();
     ctx.fillStyle=rcol;ctx.textAlign='center';
     ctx.fillText(rlab,cx0+cw/2,cy0+ch/2);ctx.textAlign='left';
-    if(near){ // 差额提示：粉色细条走完 = 本关收入再叠一截就买得起
+    if(near){ // 差额提示：橙红细条走完 = 本关收入再叠一截就买得起
       const bw=sn(150),bx=c.x+sn(78),by=c.y+sn(70),bh=Math.max(1,sn(2));
       ctx.fillStyle='rgba(255,255,255,0.1)';ctx.fillRect(bx,by,bw,bh);
-      ctx.fillStyle='#ff7a95';ctx.fillRect(bx,by,bw*Math.min(1,runCoins/p),bh);
-      ctx.font=SFS(11);ctx.fillStyle='#ff7a95';
+      ctx.fillStyle=T.dangerHi;ctx.fillRect(bx,by,bw*Math.min(1,runCoins/p),bh);
+      ctx.font=SFL(11);ctx.fillStyle=T.dangerHi;
       ctx.fillText('差 ¥'+(p-runCoins)+' · 击杀敌机补足',bx,c.y+sn(76)+sbl(11));
     }else if(!can){ // 完全买不起：锁形（两段线画，替代稿中 SVG 图标）；左移避开稀有度角标
       const ls=sn(14),lx=c.x+c.w-sn(46)-ls/2,ly=c.y+sn(13);
-      ctx.strokeStyle='#63758d';ctx.lineWidth=Math.max(1,sn(1.6));
+      ctx.strokeStyle=T.textFaint;ctx.lineWidth=Math.max(1,sn(1.6));
       ctx.strokeRect(lx,ly+ls*0.38,ls,ls*0.62);
       ctx.beginPath();ctx.arc(lx+ls/2,ly+ls*0.38,ls*0.28,Math.PI,Math.PI*2);ctx.stroke();
     }
     ctx.textAlign='right';ctx.font=SFS(17,true);
-    ctx.fillStyle=can?'#ffe600':'#ff7a95';
+    ctx.fillStyle=can?T.amberHi:T.dangerHi;
     ctx.fillText('¥ '+p,c.x+c.w-sn(14),c.y+sn(64)+sbl(17));
     ctx.textAlign='left';
   }
   // 固定升级项：战力与血线的确定性消费（掉落退役后的武器成长通道）
-  ctx.fillStyle='rgba(0,243,255,0.55)';ctx.font=SFS(11);
-  ctx.fillText('固定升级 · FIXED',SHOP_SEC.x,SHOP_SEC.y+sbl(11));
-  ctx.strokeStyle='rgba(0,243,255,0.18)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(SHOP_SEC.x,SHOP_SEC.y+sn(14));ctx.lineTo(SHOP_SEC.x+sn(120),SHOP_SEC.y+sn(14));ctx.stroke();
+  UI.sectionTitle(ctx,SHOP_SEC.x,SHOP_SEC.y+sbl(11),SHOP_SEC.w,'固定升级 · FIXED',T.rareN);
   for(let i=0;i<SHOP_FIX.length;i++){
     const f=SHOP_FIX[i],c=SHOP_FIX_CARDS[i],usable=f.can(),cost=f.cost(),can2=usable&&runCoins>=cost;
     const maxed=!usable&&(f.id==='gun'?player.wlevel>=4:f.id==='mis'?player.mlevel>=3:false); // 满级(MAX)与不适用(—)分开：前者是成就、后者是当前无关
     UI.drawChamferPanel(ctx,c.x,c.y,c.w,c.h,{
-      c:can2?'#7dff8c':(!usable?(maxed?'rgba(0,243,255,0.42)':'#4a5a70'):'#4a5a70'),
-      fill:'#0a0e16',cut:sn(8),halo:can2?sn(6):0,haloA:0.16,lw:1.5,ticks:false});
+      c:can2?T.ok:(!usable?(maxed?UI.rgba(T.rareN,0.42):T.stroke):T.stroke),
+      fill:T.panelDeep,cut:sn(8),lw:1.5,ticks:false,inner:false});
     const gw=sn(22),gx=c.x+c.w/2-gw/2;
-    ctx.fillStyle=can2?'rgba(125,255,140,0.14)':(!usable?(maxed?'rgba(0,243,255,0.10)':'rgba(120,140,170,0.08)'):'rgba(120,140,170,0.12)');
+    ctx.fillStyle=can2?UI.rgba(T.ok,0.16):(!usable?(maxed?UI.rgba(T.rareN,0.10):'rgba(120,140,170,0.08)'):'rgba(120,140,170,0.12)');
     UI.chamferPath(ctx,gx,c.y+sn(9),gw,gw,sn(5));ctx.fill();
     ctx.textAlign='center';ctx.font=SFS(13,true);
-    ctx.fillStyle=can2?'#7dff8c':(!usable?(maxed?'rgba(0,243,255,0.4)':'#4b5c72'):'#6d8098');
+    ctx.fillStyle=can2?T.okHi:(!usable?(maxed?UI.rgba(T.rareN,0.45):T.textFaint):T.textDim);
     ctx.fillText(f.name.charAt(0),c.x+c.w/2,c.y+sn(9)+gw/2);
-    ctx.font=SFS(12);
-    ctx.fillStyle=can2?'#eaffff':(!usable?(maxed?'#5f7488':'#5a6a80'):'#7a8aa0');
+    ctx.font=SFL(12);
+    ctx.fillStyle=can2?T.text:(!usable?(maxed?T.textFaint:T.textFaint):T.textDim);
     ctx.fillText(f.name,c.x+c.w/2,c.y+sn(34)+sbl(12));
     ctx.font=SFS(12,true);
-    ctx.fillStyle=usable?(can2?'#ffe600':'#ff7a95'):(maxed?'#0d7f8f':'#5a6a80');
+    ctx.fillStyle=usable?(can2?T.amberHi:T.dangerHi):(maxed?T.rareN:T.textFaint);
     ctx.fillText(usable?'¥ '+cost:(maxed?'MAX':'—'),c.x+c.w/2,c.y+sn(53)+sbl(12));
     ctx.textAlign='left';
   }
   // 刷新两用：优先看广告免费刷（每关 1 次），已用则金币刷（费用递增）
   const rc=refreshCost(),c1=SHOP_REFRESH;
   UI.drawChamferPanel(ctx,c1.x,c1.y,c1.w,c1.h,{
-    c:!adRefreshUsed?'#ff0055':(runCoins>=rc?'#00f3ff':'#4a5a70'),
-    fill:!adRefreshUsed?'rgba(46,6,20,0.92)':'#0a1220',
-    cut:sn(9),halo:!adRefreshUsed?sn(7):(runCoins>=rc?sn(6):0),haloA:0.18,lw:1.5,ticks:false});
-  ctx.textAlign='center';ctx.font=SFS(!adRefreshUsed?13:14,true);
-  ctx.fillStyle=adRefreshBusy?'#666':(!adRefreshUsed?'#ff9db6':(runCoins>=rc?'#9ad0ff':'#5a6a80'));
+    c:!adRefreshUsed?T.danger:(runCoins>=rc?T.rareN:T.stroke),
+    fill:!adRefreshUsed?'rgba(52,24,16,0.92)':T.panelDeep,
+    cut:sn(9),lw:1.5,ticks:false});
+  ctx.textAlign='center';ctx.font=SFL(!adRefreshUsed?13:14,true);
+  ctx.fillStyle=adRefreshBusy?T.textFaint:(!adRefreshUsed?T.dangerHi:(runCoins>=rc?T.rareN:T.textFaint));
   ctx.fillText(adRefreshUsed?'刷新 ¥'+rc:'▶ 看广告 免费刷新',c1.x+c1.w/2,c1.y+c1.h/2);
-  // 出战：带构筑进下一关
+  // 出战：带构筑进下一关（琥珀出战指令）
   const c2=SHOP_GO;
-  UI.drawChamferPanel(ctx,c2.x,c2.y,c2.w,c2.h,{c:'#7dff8c',fill:'rgba(10,46,24,0.94)',cut:sn(9),halo:sn(8),haloA:0.2,lw:1.5,ticks:false});
-  ctx.fillStyle='#e9ffee';ctx.font=SFS(16,true);
+  UI.drawChamferPanel(ctx,c2.x,c2.y,c2.w,c2.h,{c:T.amber,fill:'rgba(62,42,16,0.94)',cut:sn(9),lw:1.5,ticks:false});
+  ctx.fillStyle=T.amberHi;ctx.font=SFL(16,true);
   ctx.fillText('出 战',c2.x+c2.w/2-sn(8),c2.y+c2.h/2);
   const ay=c2.y+c2.h/2;
   ctx.beginPath();ctx.moveTo(c2.x+c2.w-sn(16),ay-sn(5));ctx.lineTo(c2.x+c2.w-sn(9),ay);ctx.lineTo(c2.x+c2.w-sn(16),ay+sn(5));ctx.closePath();ctx.fill();
-  ctx.fillStyle='rgba(125,255,140,0.5)';
+  ctx.fillStyle=UI.rgba(T.amber,0.5);
   ctx.beginPath();ctx.moveTo(c2.x+c2.w-sn(24),ay-sn(5));ctx.lineTo(c2.x+c2.w-sn(17),ay);ctx.lineTo(c2.x+c2.w-sn(24),ay+sn(5));ctx.closePath();ctx.fill();
   // 本关金币翻倍（每关 1 次；ADS_OFF 时整块入口不画）
   const c3=SHOP_ADCOIN,on=!ADS_OFF&&!coinDoubled&&runCoinIncome>0;
   if(!ADS_OFF){
-    UI.drawChamferPanel(ctx,c3.x,c3.y,c3.w,c3.h,{c:on?'#ffd23c':'#4a5a70',fill:on?'rgba(42,32,4,0.94)':'rgba(12,16,24,0.8)',cut:sn(8),halo:on?sn(6):0,haloA:0.16,lw:1.5,ticks:false});
-    ctx.fillStyle=on?'#ffe600':'#5a6a80';ctx.font=SFS(13,true);
+    UI.drawChamferPanel(ctx,c3.x,c3.y,c3.w,c3.h,{c:on?T.amber:T.stroke,fill:on?'rgba(62,42,16,0.94)':UI.rgba(T.panelDeep,0.8),cut:sn(8),lw:1.5,ticks:false});
+    ctx.fillStyle=on?T.amberHi:T.textFaint;ctx.font=SFL(13,true);
     ctx.fillText(coinDoubled?'本关金币已翻倍':(on?'▶ 看广告 本关金币翻倍 +'+runCoinIncome:'本关暂无金币收入'),c3.x+c3.w/2,c3.y+c3.h/2);
   }
   // 本局构筑摘要：广告关闭时上移占用原广告区，不保留空洞
   const c4=ADS_OFF?SHOP_ADCOIN:SHOP_BUILD;
-  UI.drawChamferPanel(ctx,c4.x,c4.y,c4.w,c4.h,{c:'rgba(0,243,255,0.35)',fill:'rgba(8,12,22,0.9)',cut:sn(7),lw:1,ticks:false});
-  ctx.fillStyle='rgba(180,210,235,0.78)';ctx.font=SFS(11);
+  UI.drawChamferPanel(ctx,c4.x,c4.y,c4.w,c4.h,{c:T.stroke,fill:T.panelDeep,cut:sn(7),lw:1,ticks:false,inner:false});
+  ctx.fillStyle=UI.rgba(T.textDim,0.85);ctx.font=SFL(11);
   ctx.fillText('本局构筑 '+runPicks+' 张',c4.x+sn(12),c4.y+sn(8)+sbl(11));
   const bl=shopBuildList(),ts=sn(28);
   for(let i=0;i<7;i++){
     const e=bl[i],bx=c4.x+sn(108+i*33),by=c4.y+sn(11);
-    ctx.fillStyle=e?(e.rar==='R'?'rgba(255,210,60,0.16)':'rgba(0,243,255,0.13)'):'rgba(120,140,170,0.08)';
+    ctx.fillStyle=e?UI.rgba(e.rar==='R'?T.rareR:T.rareN,0.15):'rgba(120,140,170,0.08)';
     UI.chamferPath(ctx,bx,by,ts,ts,sn(5));ctx.fill();
     if(e){
       ctx.textAlign='center';ctx.font=SFS(14,true);
-      ctx.fillStyle=e.rar==='R'?'#ffe9a0':'#5df0ff';
+      ctx.fillStyle=e.rar==='R'?T.rareR:T.rareN;
       ctx.fillText(e.letter,bx+ts/2,by+ts/2);ctx.textAlign='left';
     }
   }
   if(runTopBuff.n>0){
-    ctx.font=SFS(11);ctx.fillStyle='rgba(180,210,235,0.78)';
-    const k='最强 ',kf=SFS(11);
+    ctx.font=SFL(11);ctx.fillStyle=UI.rgba(T.textDim,0.85);
+    const k='最强 ',kf=SFL(11);
     ctx.font=kf;ctx.fillText(k,c4.x+sn(12),c4.y+sn(28)+sbl(11));
-    ctx.fillStyle='#ffe600';ctx.font=SFS(11,true);
+    ctx.fillStyle=T.amberHi;ctx.font=SFL(11,true);
     ctx.fillText(runTopBuff.name+' ×'+runTopBuff.n,c4.x+sn(12)+shopTextWidth(k,kf),c4.y+sn(28)+sbl(11));
   }
   ctx.restore();
@@ -1350,7 +1410,7 @@ function drawShop(){
 // 结算面板构筑摘要：本局拿牌数 + 最多的牌（纯展示，给结算页一点"这局玩了个什么流派"的谈资）
 function drawRunSummary(){
   if(runPicks<=0)return;
-  ctx.fillStyle='#9ad0ff';ctx.font='13px monospace';ctx.textAlign='center';
+  ctx.fillStyle=T.textDim;ctx.font='13px '+T.fontUI;ctx.textAlign='center';
   ctx.fillText(`构筑 ${runPicks} 张 · ${runTopBuff.name}×${runTopBuff.n}`,W/2,H/2+206); // 下移避开 toast 行(H/2+188)
   ctx.textAlign='left';
 }
@@ -1361,7 +1421,6 @@ function loop(){
   const nowMs=Date.now();
   const dt=Math.min(0.05,(nowMs-last)/1000);last=nowMs;
   if(msgT>0)msgT-=dt;
-  if(dbgTap&&(dbgTap.t-=dt)<=0)dbgTap=null; // TEMP DEBUG
   for(const s of stars){s.y+=s.v*dt*(state==='playing'?1:0.3);if(s.y>H){s.y=-2;s.x=Math.random()*W;}}
   // 纯视觉特效时钟：与游戏状态无关，顿帧/暂停期间也持续走（链条爆、冲击波、流星）
   for(let i=chainBooms.length-1;i>=0;i--){const c=chainBooms[i];c.t-=dt;

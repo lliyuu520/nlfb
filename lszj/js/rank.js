@@ -3,6 +3,7 @@
 // 世界榜：wx.request 直连 nulei-server，token 为服务端 HMAC 签发，过期静默重登一次。
 "use strict";
 const UI = require('./ui.js');
+const T = require('./theme.js'); // 军武航空仪表静态主题 token
 
 // 线上地址（nginx 将 /nulei/ 反代到 nulei-server）。联调本地服务时临时改为 http://127.0.0.1:12700/nulei/api
 const API = 'https://game.lliyuu520.cn/nulei/api';
@@ -11,7 +12,8 @@ const KV_KEY = 'nulei_hi'; // 好友榜云 KV key，与本地最高分同义
 const PAGE = 7;            // 每页行数（好友榜 sharedCanvas 按此高度渲染）
 const PANEL = { x: 26, y: 144, w: 428, h: 512 };
 const SUB_W = 760, SUB_H = 616; // sharedCanvas 尺寸（内容区 380×308 的 2 倍）
-const COL = { cyan: '#00f3ff', pink: '#ff0055', gold: '#ffe600', dim: '#8892a8', txt: '#e6eeff' };
+const COL = { cyan: T.rareN, pink: T.dangerHi, gold: T.amber, dim: T.textDim, txt: T.text }; // 军武语义色：钢蓝/危险橙红/琥珀
+const MF = T.fontData, UF = T.fontUI; // 数字走数据字体，中文标签走 sans-serif
 
 let sx = 1, sy = 1, onClose = null;
 let tab = 'friend'; // friend | world
@@ -183,7 +185,7 @@ function chip(ctx, b, color, txt, txtColor) {
   UI.drawNeonPanel(ctx, b.x, b.y, b.w, b.h, '', color);
   if (txt) {
     ctx.fillStyle = txtColor || color;
-    ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
+    ctx.font = 'bold 14px ' + UF; ctx.textAlign = 'center';
     ctx.fillText(txt, b.x + b.w / 2, b.y + b.h / 2 + 5);
   }
 }
@@ -191,8 +193,8 @@ function chip(ctx, b, color, txt, txtColor) {
 function centerText(ctx, lines) {
   ctx.textAlign = 'center';
   lines.forEach((s, i) => {
-    ctx.fillStyle = i === 0 ? COL.dim : 'rgba(156,163,175,0.6)';
-    ctx.font = (i === 0 ? 'bold 15px' : '14px') + ' monospace';
+    ctx.fillStyle = i === 0 ? COL.dim : UI.rgba(T.textDim, 0.6);
+    ctx.font = (i === 0 ? 'bold 15px ' : '14px ') + UF;
     ctx.fillText(s, CONTENT.x + CONTENT.w / 2, CONTENT.y + 130 + i * 24);
   });
 }
@@ -204,17 +206,17 @@ function drawWorldRows(ctx) {
   if (!rows.length) { centerText(ctx, ['还没有人上榜', '玩一局抢占第一名']); return; }
   rows.forEach((r, i) => {
     const y = CONTENT.y + i * 44;
-    if (me && me.rank && r.rank === me.rank) {
-      ctx.fillStyle = 'rgba(0,243,255,0.10)'; ctx.fillRect(CONTENT.x, y, CONTENT.w, 42);
+    if (me && me.rank && r.rank === me.rank) { // 自己的行：低亮度军绿底
+      ctx.fillStyle = UI.rgba(T.ok, 0.12); ctx.fillRect(CONTENT.x, y, CONTENT.w, 42);
     }
-    ctx.fillStyle = rankColor(r.rank); ctx.font = 'bold 15px monospace'; ctx.textAlign = 'left';
+    ctx.fillStyle = rankColor(r.rank); ctx.font = 'bold 15px ' + MF; ctx.textAlign = 'left';
     ctx.fillText('#' + r.rank, CONTENT.x + 8, y + 27);
-    ctx.fillStyle = r.rank === (me && me.rank) ? COL.cyan : COL.txt; ctx.font = '14px monospace';
+    ctx.fillStyle = r.rank === (me && me.rank) ? COL.cyan : COL.txt; ctx.font = '14px ' + UF;
     ctx.fillText(r.name, CONTENT.x + 56, y + 27);
-    ctx.fillStyle = '#7dff8c'; ctx.textAlign = 'right';
+    ctx.fillStyle = T.okHi; ctx.font = '14px ' + MF; ctx.textAlign = 'right';
     ctx.fillText(String(r.score), CONTENT.x + CONTENT.w - 10, y + 27);
     if (i < rows.length - 1) {
-      ctx.strokeStyle = 'rgba(0,243,255,0.10)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = UI.rgba(T.stroke, 0.5); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(CONTENT.x, y + 42.5); ctx.lineTo(CONTENT.x + CONTENT.w, y + 42.5); ctx.stroke();
     }
   });
@@ -235,21 +237,21 @@ function drawFriendRows(ctx) {
 function draw(ctx, W, H) {
   layout(insetFn(), H); // 先按底部遮挡区重排，再绘制
   ctx.setTransform(sx, 0, 0, sy, 0, 0);
-  ctx.fillStyle = 'rgba(2,4,10,0.72)'; ctx.fillRect(0, 0, W, H);
-  const glow = tab === 'friend' ? COL.cyan : COL.pink;
-  UI.drawNeonPanel(ctx, PANEL.x, PANEL.y, PANEL.w, PANEL.h, '排行榜', glow);
-  chip(ctx, CLOSE, '#ff0055', '✕ 返回', '#ff7a95');
-  for (const tb of TABS) chip(ctx, tb, tab === tb.key ? glow : '#3a4356', tb.t, tab === tb.key ? '#fff' : COL.dim);
+  ctx.fillStyle = UI.rgba(T.bg, 0.78); ctx.fillRect(0, 0, W, H);
+  // 面板统一钢灰描边，好友榜/世界榜不再整屏换色，仅以琥珀标识选中 Tab
+  UI.drawNeonPanel(ctx, PANEL.x, PANEL.y, PANEL.w, PANEL.h, '排行榜', T.strokeHi);
+  chip(ctx, CLOSE, COL.pink, '✕ 返回', COL.pink);
+  for (const tb of TABS) chip(ctx, tb, tab === tb.key ? T.amber : T.stroke, tb.t, tab === tb.key ? T.amberHi : COL.dim);
 
   // 我的记录条
-  ctx.textAlign = 'left'; ctx.font = '14px monospace';
+  ctx.textAlign = 'left'; ctx.font = '14px ' + UF;
   if (tab === 'world') {
     if (me) {
       ctx.fillStyle = me.custom ? COL.cyan : COL.dim;
       ctx.fillText(me.name + (me.rank ? ' · 第' + me.rank + '名' : ''), PANEL.x + 16, PANEL.y + 116);
-      ctx.fillStyle = COL.gold; ctx.textAlign = 'right';
+      ctx.fillStyle = COL.gold; ctx.font = '14px ' + MF; ctx.textAlign = 'right';
       ctx.fillText(String(me.best || 0), RENAME.x - 12, PANEL.y + 116);
-      chip(ctx, RENAME, '#3a4356', '改名', '#9feaff');
+      chip(ctx, RENAME, T.stroke, '改名', COL.cyan);
     } else {
       ctx.fillStyle = COL.dim; ctx.fillText(loading ? '连接服务中...' : '服务未连接', PANEL.x + 16, PANEL.y + 116);
     }
@@ -263,11 +265,11 @@ function draw(ctx, W, H) {
   // 翻页
   if (tab === 'world' && world) {
     const maxPage = Math.max(0, Math.ceil(world.list.length / PAGE) - 1);
-    ctx.fillStyle = COL.dim; ctx.font = '14px monospace'; ctx.textAlign = 'center';
+    ctx.fillStyle = COL.dim; ctx.font = '14px ' + MF; ctx.textAlign = 'center';
     ctx.fillText('第 ' + (worldPage + 1) + '/' + (maxPage + 1) + ' 页', PANEL.x + PANEL.w / 2, FOOT_L.y + 23);
   }
-  chip(ctx, FOOT_L, '#3a4356', '◀', '#9feaff');
-  chip(ctx, FOOT_R, '#3a4356', '▶', '#9feaff');
+  chip(ctx, FOOT_L, T.stroke, '◀', COL.cyan);
+  chip(ctx, FOOT_R, T.stroke, '▶', COL.cyan);
 }
 
 module.exports = { setup, open, draw, onTouch, report, SUB_W, SUB_H };
