@@ -29,8 +29,17 @@ const clampPage = p => Math.max(0, Math.min(maxPage(), p));
 
 wx.onMessage(m => {
   if (!m) return;
-  if (m.type === 'render') { page = clampPage(m.page || 0); load(); }
-  else if (m.type === 'page') { page = clampPage(page + (m.delta || 0)); draw(); }
+  if (m.type === 'render') {
+    page = clampPage(m.page || 0);
+    // 先用缓存立刻上屏：切回好友榜时 sharedCanvas 可能已被系统清空，
+    // 若直接等 getFriendCloudStorage 异步回来，中间帧会整块空白
+    if (list.length) draw();
+    load();
+  } else if (m.type === 'redraw') {
+    // 轻量重绘（不拉网）：主域周期性保活，防止开放数据域停绘后画布被回收
+    page = clampPage(m.page != null ? m.page : page);
+    if (list.length) draw();
+  } else if (m.type === 'page') { page = clampPage(page + (m.delta || 0)); draw(); }
 });
 
 function load() {
@@ -51,7 +60,8 @@ function load() {
       page = clampPage(page);
       draw();
     },
-    fail: () => { list = []; drawMsg(['暂时拿不到好友数据', '稍后再来试试']); },
+    // 失败时保留已有缓存：切 Tab 再拉一次失败不应把已展示的好友榜清空
+    fail: () => { if (!list.length) drawMsg(['暂时拿不到好友数据', '稍后再来试试']); },
   });
 }
 

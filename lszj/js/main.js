@@ -97,9 +97,11 @@ let reviveUsed=0,reviving=false,msg='',msgT=0;
 const REVIVE_BTN={x:W/2-150,y:H/2+52,w:145,h:48};
 const restartRect=()=>reviveUsed<MAX_REVIVE&&!ADS_OFF?{x:W/2+5,y:H/2+52,w:145,h:48}:{x:W/2-72,y:H/2+52,w:144,h:48};
 // 结算金币（v0.2.0）：金币为局内货币（商店购牌），死亡/返回主页时剩余按 1/5 折算为局外存款，可看广告翻倍一次
-let settleDoubled=false;
+let settleDoubled=false,runSettled=false; // runSettled：本局是否已入账，防止死亡结算与回标题二次折算
 const OVER_COIN_BTN={x:W/2-140,y:H/2+112,w:280,h:38};
 function convertLeftoverCoins(){
+  if(runSettled)return; // 幂等：gameOver 与 goTitle 都可能触达，只入账一次
+  runSettled=true;
   settleConverted=Math.ceil(runCoins/5);
   if(settleConverted>0){coins+=settleConverted;saveCoins();}
   settleDoubled=false;
@@ -181,7 +183,7 @@ const REWARD_COINS=50; // 每次完整观看激励视频奖励金币
 const ADS_OFF=true;
 // 新手引导（极简版）：仅首次游戏开局 8 秒显示操作提示，看满写档永不再出（30 秒内知道怎么玩）
 let tutDone=!!lsGet('nulei_tut',false);
-const VERSION='0.2.3'; // 与 version.json 的 latest 保持一致（设置页"关于"展示）
+const VERSION='0.2.4'; // 与 version.json 的 latest 保持一致（设置页"关于"展示）
 // 升级项预留：数值效果已接入掉率(dropItem)与伤害(update)，商店 UI 上线后调 buyUpgrade 即可
 const UPGRADES={
   drop:{max:5,cost:l=>120*(l+1),val:l=>1+l*0.25}, // 掉落率：每级 +25%（关卡基础值 dropRate() × 倍率）
@@ -197,7 +199,7 @@ const BUFFS=[
   {id:'magnet',name:'磁力吸附', rar:'N', max:3, letter:'磁', desc:'道具拾取范围 +12'},
   {id:'drop',  name:'幸运徽章', rar:'N', max:3, letter:'运', desc:'道具掉落率 +30%'},
   {id:'greed', name:'贪婪芯片', rar:'N', max:3, letter:'财', desc:'击杀金币 +20%'},
-  {id:'armor', name:'纳米装甲', rar:'N', max:2, letter:'甲', desc:'生命上限+1 并立即+1'},
+  {id:'armor', name:'纳米装甲', rar:'N', max:2, letter:'甲', desc:'生命上限+25 并立即回复25'},
   {id:'invuln',name:'相位涂层', rar:'N', max:2, letter:'隐', desc:'受击无敌时间 +0.5秒'},
   {id:'crit',  name:'暴击核心', rar:'R', max:3, letter:'暴', desc:'12% 概率双倍伤害'},
   {id:'laser', name:'激光增幅', rar:'R', max:3, letter:'激', desc:'激光伤害+40% 弹径+'},
@@ -481,7 +483,7 @@ function startGame(){
   state='playing';stage=1;score=0;elapsed=0;runTime=0;spawnT=1;boss=null;clearT=0;miniSpawned=false;
   warnT=0;hitStop=0;shockwaves=[];chainBooms=[];lastDropT=-9;killsSinceDrop=0;
   bullets=[];ebullets=[];enemies=[];items=[];parts=[];
-  reviveUsed=0;reviving=false;msgT=0;settleConverted=0;settleDoubled=false;
+  reviveUsed=0;reviving=false;msgT=0;settleConverted=0;settleDoubled=false;runSettled=false;
   Object.assign(player,{x:W/2,y:H-90,hp:100,maxHp:100,inv:2,weapon:'std',wlevel:2,mis:'none',mlevel:0,fireT:0,misT:0,
     buffs:{},shield:0,shieldT:0,r:5});
   runCoins=0;offer=[];runPicks=0;runTopBuff={name:'',n:0};adRefreshUsed=ADS_OFF;adRefreshBusy=false;shopRefreshN=0;runCoinsAtStage=0;runCoinIncome=0;coinDoubled=false;
@@ -492,7 +494,8 @@ function goTitle(){if(runCoins>0||state==='over')convertLeftoverCoins();state='t
 function gameOver(){
   state='over';
   Sfx.bgmStop();Sfx.play('over');
-  convertLeftoverCoins();
+  // 仍有复活机会时先不折算：复活后局内金币继续用于补给站；真正结束（无复活或回标题）再入账
+  if(ADS_OFF||reviveUsed>=MAX_REVIVE)convertLeftoverCoins();
   if(score>hi){hi=score;lsSet('nulei_hi',hi);
     // 双榜同步：好友榜走微信托管 KV（子域读取），世界榜上报 nulei-server（失败静默）
     try{wx.setUserCloudStorage({KVDataList:[{key:'nulei_hi',value:String(hi)}],fail:()=>{}});}catch(e){}

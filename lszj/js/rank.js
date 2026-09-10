@@ -129,6 +129,12 @@ function postRender() {
   try { ODC.postMessage({ type: 'render', page: friendPage }); } catch (e) {}
 }
 
+// 轻量保活：不拉好友数据，只让子域用缓存重绘 sharedCanvas
+function postRedraw() {
+  if (!ODC) return;
+  try { ODC.postMessage({ type: 'redraw', page: friendPage }); } catch (e) {}
+}
+
 function loadWorld() {
   loading = true; worldErr = '';
   authed('GET', '/rank?limit=100', null, (st, res) => {
@@ -222,8 +228,13 @@ function drawWorldRows(ctx) {
   });
 }
 
+let odcPingT = 0;
 function drawFriendRows(ctx) {
   if (!ODC || !ODC.canvas || ODC.canvas.width < 2) { centerText(ctx, ['当前基础库不支持好友榜']); return; }
+  // 真机上开放数据域停止绘制后 sharedCanvas 可能被系统清空/回收；
+  // 每 600ms 请求子域按缓存重绘一次，保证主域 drawImage 始终有有效像素
+  const now = Date.now();
+  if (now - odcPingT > 600) { odcPingT = now; postRedraw(); }
   // 子域把内容画在画布中央的 SUB_W:SUB_H 比例矩形（见 openDataContext/index.js contentRect），
   // 真机 sharedCanvas 尺寸/比例不可控 —— 这里裁剪画布中央同比例区域拉伸铺满 CONTENT，
   // 内容比例恒等于 CONTENT，任意画布尺寸下不变形、字号恒定

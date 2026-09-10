@@ -1,6 +1,11 @@
 {
-  "latest": "0.2.3",
+  "latest": "0.2.4",
   "history": [
+    {
+      "version": "0.2.4",
+      "date": "2026-09-09",
+      "desc": "V1收口：全UI军武航空仪表风；正式包packOptions补齐(.env/.idea/.zcode/__pycache__/loop.js)；sfx存档读写容错；局内金币结算幂等且复活窗口内不折算；好友榜sharedCanvas保活重绘；纳米装甲文案对齐血条制"
+    },
     {
       "version": "0.2.3",
       "date": "2026-09-07",

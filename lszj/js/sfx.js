@@ -4,16 +4,19 @@
 "use strict";
 
 // ---------- 全局开关（设置页页眉开关控制，持久化到本地存储，默认开） ----------
-let sfxOn = wx.getStorageSync('nulei_sfx') !== 'off';
-let bgmOn = wx.getStorageSync('nulei_bgm') !== 'off';
+// 存储读写统一容错：异常时按默认开处理，不带崩冷启动
+const lsGet=(k,d)=>{try{const v=wx.getStorageSync(k);return(v===''||v==null)?d:v;}catch(e){return d;}};
+const lsSet=(k,v)=>{try{wx.setStorageSync(k,v);}catch(e){}};
+let sfxOn = lsGet('nulei_sfx','on') !== 'off';
+let bgmOn = lsGet('nulei_bgm','on') !== 'off';
 function toggleSfx(){
   sfxOn = !sfxOn;
-  try { wx.setStorageSync('nulei_sfx', sfxOn ? 'on' : 'off'); } catch (e) {}
+  lsSet('nulei_sfx', sfxOn ? 'on' : 'off');
   return sfxOn;
 }
 function toggleBgm(){
   bgmOn = !bgmOn;
-  try { wx.setStorageSync('nulei_bgm', bgmOn ? 'on' : 'off'); } catch (e) {}
+  lsSet('nulei_bgm', bgmOn ? 'on' : 'off');
   // 关：暂停保留进度；开：若正处于战斗（bgmWant）立即续播
   if (!bgmOn) { if (bgm) { try { bgm.pause(); } catch (e) {} } }
   else if (bgm && bgmWant) { try { bgm.play(); } catch (e) {} }
@@ -24,10 +27,8 @@ function toggleBgm(){
 function toggleAll(){
   const on = !(sfxOn && bgmOn);
   sfxOn = bgmOn = on;
-  try {
-    wx.setStorageSync('nulei_sfx', on ? 'on' : 'off');
-    wx.setStorageSync('nulei_bgm', on ? 'on' : 'off');
-  } catch (e) {}
+  lsSet('nulei_sfx', on ? 'on' : 'off');
+  lsSet('nulei_bgm', on ? 'on' : 'off');
   if (!on) { if (bgm) { try { bgm.pause(); } catch (e) {} } }
   else if (bgm && bgmWant) { try { bgm.play(); } catch (e) {} }
   return on;
